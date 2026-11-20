@@ -24,16 +24,24 @@ function firstString(...values) {
   return values.find(value => typeof value === "string" && value.length > 0) ?? null;
 }
 
+function firstId(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.length > 0) return value;
+    if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
+  }
+  return null;
+}
+
 function normalizeDelta(delta) {
   if (!delta || typeof delta !== "object" || Array.isArray(delta)) return null;
   const kind = firstString(delta.class, delta.type, delta.deltaType);
   if (!kind) return null;
   const metadata = delta.messageMetadata && typeof delta.messageMetadata === "object"
     ? delta.messageMetadata : {};
-  const threadID = firstString(metadata.threadKey?.threadFbId, metadata.threadKey?.otherUserFbId,
+  const threadID = firstId(metadata.threadKey?.threadFbId, metadata.threadKey?.otherUserFbId,
     metadata.thread_id, delta.threadID, delta.threadId);
-  const messageID = firstString(metadata.messageId, metadata.message_id, delta.messageId, delta.message_id);
-  const senderID = firstString(metadata.actorFbId, metadata.senderId, delta.senderId, delta.actorId);
+  const messageID = firstId(metadata.messageId, metadata.message_id, delta.messageId, delta.message_id);
+  const senderID = firstId(metadata.actorFbId, metadata.senderId, delta.senderId, delta.actorId);
   const timestamp = metadata.timestamp ?? metadata.timestampMs ?? delta.timestamp;
   const base = { threadID, messageID, senderID, timestamp: timestamp ?? null, rawDelta: delta };
 
