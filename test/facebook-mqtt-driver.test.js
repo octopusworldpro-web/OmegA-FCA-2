@@ -187,3 +187,19 @@ test("native driver rejects an encrypted snapshot restored for a different Faceb
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("SessionGuard refuses to use the GoatBot account.txt path for encrypted output", async () => {
+  await assert.rejects(createFacebookMqttDriver({
+    appState,
+    socketFactory: () => new FakeWebSocket(),
+    sessionGuard: { filePath: path.resolve(process.cwd(), "account.txt"), key: "e".repeat(64) }
+  }), /separate from GoatBot account.txt/);
+});
+
+test("SessionGuard rejects malformed encryption keys before network setup", async () => {
+  await assert.rejects(createFacebookMqttDriver({
+    appState,
+    socketFactory: () => new FakeWebSocket(),
+    sessionGuard: { filePath: path.join(os.tmpdir(), "omega-invalid-key.enc"), key: "not-a-key" }
+  }), /32 bytes or exactly 64 hexadecimal/);
+});
