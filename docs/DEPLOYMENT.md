@@ -6,7 +6,7 @@ OmegA-FCA is a **Node.js library**, not a standalone web server. For the current
 
 The AppState smoke test validates an owner-supplied Facebook session over HTTPS and reports the account ID, session state, and validation time. It does **not** establish the private Messenger realtime connection, subscribe to events, send messages, or make this package a drop-in GoatBot FCA replacement.
 
-Native email/password login is intentionally deferred. The test runner rejects credential mode and only accepts cookie/AppState data.
+Native email/password login is intentionally deferred. The test runner rejects credential mode and only accepts cookie/AppState data. The native driver can optionally persist an encrypted AppState snapshot after MQTT setup when an explicit session-guard key is configured.
 
 ## Requirements
 
@@ -46,6 +46,10 @@ node node_modules/@omega/fca/examples/appstate-session-check.js
 ~~~
 
 This command validates the AppState session layer only. It does not prove that GoatBot can receive Messenger events through OmegA-FCA.
+
+## Optional encrypted session persistence
+
+When using `createFacebookMqttClient()`, pass `sessionGuard: { filePath, key, intervalMs }` to enable automatic encrypted AppState snapshots after a successful MQTT connection. Use a private writable volume/path for `filePath` and provide `key` from a secret manager or environment variable (64 hexadecimal characters or a 32-byte Buffer). Do not commit the key or encrypted session files. The driver creates a verified backup and attempts a final save on logout. This does not replace the original login credential or remove the need for the owner to refresh an expired Facebook session.
 
 ## Railway / Render notes
 
