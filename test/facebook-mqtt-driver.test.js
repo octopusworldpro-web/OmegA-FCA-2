@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createFacebookMqttDriver } = require("../src/transport/facebookMqttDriver");
+const { createFacebookMqttClient } = require("../src/compat/facebookMqttClient");
 const mqtt = require("../src/transport/mqtt311Codec");
 
 const appState = [
@@ -114,6 +115,42 @@ test("legacy GoatBot account.txt SessionGuard call activates only the separate e
     assert.notEqual(fs.readFileSync(encryptedPath, "utf8"), originalAccount);
   } finally {
     if (driver) await driver.disconnect();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("GoatBot legacy SessionGuard alias uses optional FCA deployment environment settings", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-env-guard-"));
+  const accountPath = path.join(directory, "account.txt");
+  const encryptedPath = path.join(directory, "private", "session.enc");
+  const originalAccount = JSON.stringify(appState);
+  fs.writeFileSync(accountPath, originalAccount, "utf8");
+  const previous = {
+    file: process.env.FCA_SESSION_FILE,
+    key: process.env.FCA_SESSION_KEY,
+    interval: process.env.FCA_SESSION_INTERVAL_MS
+  };
+  let client;
+  try {
+    process.env.FCA_SESSION_FILE = encryptedPath;
+    process.env.FCA_SESSION_KEY = "c".repeat(64);
+    process.env.FCA_SESSION_INTERVAL_MS = "180000";
+    client = createFacebookMqttClient({
+      socketFactory: () => new FakeWebSocket(),
+      fetchImpl: async () => htmlResponse(),
+      mqtt: { keepAlive: 0 }
+    });
+    const api = await client.login({ mode: "appstate", appState });
+    const configured = api.sessionGuard(accountPath, { interval: 180_000, debounce: 30_000 });
+    assert.equal(configured.filePath, encryptedPath);
+    assert.equal(fs.existsSync(encryptedPath), true);
+    assert.equal(fs.readFileSync(accountPath, "utf8"), originalAccount);
+    await client.logout();
+  } finally {
+    if (client) await client.logout().catch(() => {});
+    if (previous.file === undefined) delete process.env.FCA_SESSION_FILE; else process.env.FCA_SESSION_FILE = previous.file;
+    if (previous.key === undefined) delete process.env.FCA_SESSION_KEY; else process.env.FCA_SESSION_KEY = previous.key;
+    if (previous.interval === undefined) delete process.env.FCA_SESSION_INTERVAL_MS; else process.env.FCA_SESSION_INTERVAL_MS = previous.interval;
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
