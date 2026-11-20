@@ -205,7 +205,7 @@ async function createPersonalSession({
 
   try {
     const bootstrapStartedAt = Date.now();
-    const safeFacebookHost = host => /(^|\\.)facebook\\.com$/i.test(host) || /(^|\\.)messenger\\.com$/i.test(host);
+    const safeFacebookHost = host => /(^|\.)facebook\.com$/i.test(host) || /(^|\.)messenger\.com$/i.test(host);
     let currentUrl = new URL(FACEBOOK_ORIGIN + "/");
     let response;
     let html = "";
@@ -234,7 +234,7 @@ async function createPersonalSession({
       });
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers?.get?.("location") || "";
-        if (/checkpoint|challenge/i.test(location) || /login\\.php|\\/login(?:[/?]|$)/i.test(location)) break;
+        if (/checkpoint|challenge/i.test(location) || /login\.php|\/login(?:[/?]|$)/i.test(location)) break;
         if (!location || redirectCount >= 5) {
           throw sessionError("Facebook returned an unexpected redirect while validating the session", "FCA_UNEXPECTED_REDIRECT", "error");
         }
