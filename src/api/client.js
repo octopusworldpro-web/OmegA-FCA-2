@@ -123,7 +123,9 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
               ? "The Facebook session has expired; supply a fresh authorized AppState"
               : isRealtimeFailure
                 ? "Facebook session was accepted, but Messenger realtime setup failed (" + safeProviderCode + ")"
-                : "Authentication failed; inspect provider diagnostics securely");
+                : safeProviderCode === "FCA_SESSION_GUARD_MISSING" || safeProviderCode === "FCA_SESSION_SNAPSHOT_MISSING" || safeProviderCode === "FCA_SESSION_RESTORE_FAILED"
+                  ? "No usable encrypted saved Facebook session is available; supply AppState or configure SessionGuard"
+                  : "Authentication failed; inspect provider diagnostics securely");
           if (sessionState === "checkpoint") {
             error.code = "FCA_CHECKPOINT_REQUIRED";
             error.sessionState = sessionState;
