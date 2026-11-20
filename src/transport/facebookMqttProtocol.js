@@ -34,7 +34,7 @@ function parseJsonPayload(bytes) {
  */
 function createFacebookMqttProtocol(options = {}) {
   const userId = safeId(options.userId, "userId");
-  const clientId = options.clientId ?? ("mqttwsclient_" + randomUUID().replaceAll("-", "").slice(0, 20));
+  const clientId = options.clientId ?? "mqttwsclient";
   if (typeof clientId !== "string" || !/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) {
     throw new TypeError("clientId must be 8-128 safe characters");
   }
@@ -54,7 +54,6 @@ function createFacebookMqttProtocol(options = {}) {
     throw new TypeError("Facebook MQTT URL must use edge-chat.facebook.com/chat");
   }
   url.searchParams.set("sid", String(sessionId));
-  url.searchParams.set("cid", deviceId);
   if (options.region) {
     if (!/^[a-z]{2,8}$/i.test(options.region)) throw new TypeError("region is invalid");
     url.searchParams.set("region", options.region.toLowerCase());
@@ -91,7 +90,7 @@ function createFacebookMqttProtocol(options = {}) {
     protocol: Object.freeze({
       async authenticate(socket, context) {
         socket.send(mqtt.encodeConnect({
-          clientId, protocolId: "MQIsdp", protocolVersion: 3, keepAlive: options.keepAlive ?? 60,
+          clientId, protocolId: "MQIsdp", protocolVersion: 3, keepAlive: options.keepAlive ?? 10,
           cleanSession: true, username: JSON.stringify(username)
         }));
         const response = decodePacket(await context.waitForFrame());
@@ -115,7 +114,7 @@ function createFacebookMqttProtocol(options = {}) {
           throw error;
         }
         const queue = {
-          sync_api_version: 11, max_deltas_able_to_process: 200, delta_batch_size: 200,
+          sync_api_version: 10, max_deltas_able_to_process: 1000, delta_batch_size: 500,
           encoding: "JSON", entity_fbid: userId,
           initial_titan_sequence_id: lastSeqId ?? null, device_params: null
         };
