@@ -108,7 +108,7 @@ async function createFacebookMqttDriver({
   } catch (error) {
     if (guard) { try { guard.close(); } catch {} }
     try { if (transport) await transport.disconnect(); } catch {}
-    session.close();
+    if (session) session.close();
     throw error;
   }
 }
