@@ -170,3 +170,15 @@ test("GoatBot adapter reports missing root account config through callback", asy
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("GoatBot adapter forwards encrypted SessionGuard restore mode", async () => {
+  let received;
+  const api = { getCurrentUserID: () => "123456" };
+  const login = createGoatBotLogin({
+    async login(credentials) { received = credentials; return api; }
+  });
+  const result = await login({ mode: "session" }, () => {});
+  assert.equal(result, api);
+  assert.deepEqual(received, { mode: "session" });
+});
