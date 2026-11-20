@@ -25,7 +25,7 @@ async function importBrowserSession({ context, filePath, key, backupPath } = {})
     "https://www.messenger.com/"
   ]);
   const cookies = validateSessionCookies(raw
-    .filter(cookie => /(^|\\.)facebook\\.com$|(^|\\.)messenger\\.com$/i.test(cookie.domain || ""))
+    .filter(cookie => /(^|\.)facebook\.com$|(^|\.)messenger\.com$/i.test(cookie.domain || ""))
     .map(cookie => ({
       key: cookie.name,
       value: cookie.value,
