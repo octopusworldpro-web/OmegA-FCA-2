@@ -72,3 +72,31 @@ Raw WebSocket frames are written to `.omega-capture/private/frames.ndjson` and m
 - CDP attachment requires a browser that explicitly exposes a compatible debugging endpoint.
 - This tool does not bypass login, checkpoints, 2FA, rate limits, or platform security.
 - Captures are evidence, not a protocol implementation. Native FCA behavior must be implemented only from reviewed, reproducible evidence.
+
+
+## Import the signed-in browser session into encrypted storage
+
+This is the owner-mediated authentication path for accounts that have completed login and any Facebook checkpoint/2FA in the official browser UI. It does not automate password entry, read passwords, bypass a challenge, or send credentials to a provider.
+
+1. Open Facebook in your own browser and sign in normally. Complete any 2FA/checkpoint directly with Facebook.
+2. Keep that browser profile open and attach CDP locally as described above. The browser must be the same profile that is signed in.
+3. Create a local encryption key. Keep it in your shell/secret manager only; never commit it or paste it into chat:
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+4. In the same local shell, set the key and run the importer:
+
+```sh
+export FCA_SESSION_KEY='YOUR_LOCALLY_GENERATED_64_HEX_CHAR_KEY'
+export OMEGA_CDP_URL='http://127.0.0.1:9222'
+export FCA_SESSION_FILE='./private/facebook-session.enc'
+npm run import:browser-session
+```
+
+The importer reads only Facebook/Messenger cookies from the already-authenticated browser context, requires both `c_user` and `xs`, and writes them directly to an encrypted SessionGuard file plus a verified encrypted backup. It prints only the account ID, cookie count, and output paths—not cookie values. The encryption key must remain available to the bot at runtime as `FCA_SESSION_KEY`.
+
+Then configure the native client with the same encrypted path and key, and call `client.login({ mode: "session" })`. The native driver revalidates the session with Facebook and checks the account identity before connecting MQTT. If Facebook expires the session, repeat the owner-operated browser sign-in/import flow.
+
+**Android note:** use the Termux + ADB/CDP setup above first. The importer runs in Termux and attaches to the browser profile only if the CDP endpoint exposes that profile. Do not export cookies to clipboard, shell history, a file in Git, or a public service. Keep the encrypted file and its `.bak` beside private runtime data, outside the repository. Do not enable `--save-private-frames` for ordinary login/import.
