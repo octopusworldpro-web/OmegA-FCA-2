@@ -34,6 +34,7 @@ function parseJsonPayload(bytes) {
  */
 function createFacebookMqttProtocol(options = {}) {
   const userId = safeId(options.userId, "userId");
+  const keepAliveSeconds = options.keepAlive ?? 10;
   const clientId = options.clientId ?? "mqttwsclient";
   if (typeof clientId !== "string" || !/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) {
     throw new TypeError("clientId must be 8-128 safe characters");
@@ -89,7 +90,6 @@ function createFacebookMqttProtocol(options = {}) {
     session: Object.freeze({ userId, clientId, sessionId, deviceId, appId }),
     protocol: Object.freeze({
       async authenticate(socket, context) {
-        const keepAliveSeconds = options.keepAlive ?? 10;
         socket.send(mqtt.encodeConnect({
           clientId, protocolId: "MQIsdp", protocolVersion: 3, keepAlive: keepAliveSeconds,
           cleanSession: true, username: JSON.stringify(username)
