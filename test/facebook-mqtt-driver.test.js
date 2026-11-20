@@ -101,3 +101,26 @@ test("native driver rejects SessionGuard without an explicit encryption key", as
     sessionGuard: { filePath: "/tmp/omega-session.enc" }
   }), /explicit 32-byte\/64-hex encryption key/);
 });
+
+
+test("native driver rejects an encrypted snapshot restored for a different Facebook account", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-identity-"));
+  const filePath = path.join(directory, "session.enc");
+  const key = "9".repeat(64);
+  require("../src/security/sessionStore").saveSession(filePath, {
+    version: 1,
+    userId: "999999999999999",
+    appState,
+    savedAt: Date.now()
+  }, key);
+  try {
+    await assert.rejects(createFacebookMqttDriver({
+      fetchImpl: async () => htmlResponse(),
+      socketFactory: () => new FakeWebSocket(),
+      mqtt: { keepAlive: 0 },
+      sessionGuard: { filePath, key }
+    }), error => error.code === "FCA_SESSION_IDENTITY_MISMATCH");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
