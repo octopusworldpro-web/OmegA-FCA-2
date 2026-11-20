@@ -38,3 +38,21 @@ test("returns empty realtime metadata when no supported config exists", () => {
     lastSeqId: null
   });
 });
+
+test("extracts reordered fields from an MqttWebConfig object", () => {
+  const html = String.raw`["MqttWebConfig",[],{fbid:"123456789",endpoint:"wss:\/\/edge-chat.facebook.com\/chat?region=iad",irisSeqID:"246801357",appID:219994525426954}]`;
+  assert.deepEqual(extractRealtimeConfig(html), {
+    endpoint: "wss://edge-chat.facebook.com/chat?region=iad",
+    region: "iad",
+    lastSeqId: "246801357"
+  });
+});
+
+test("rejects an otherwise valid broker URL with an unexpected port", () => {
+  const html = 'irisSeqID:"987654321",appID:219994525426954,endpoint:"wss://edge-chat.facebook.com:8443/chat"';
+  assert.deepEqual(extractRealtimeConfig(html), {
+    endpoint: null,
+    region: null,
+    lastSeqId: null
+  });
+});
