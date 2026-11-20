@@ -85,8 +85,8 @@ async function createFacebookMqttDriver({
         if (closed) return;
         closed = true;
         try {
-          await stopSessionGuard();
-          await transport.disconnect();
+          try { await stopSessionGuard(); }
+          finally { await transport.disconnect(); }
         } finally { session.close(); }
       }
     });
