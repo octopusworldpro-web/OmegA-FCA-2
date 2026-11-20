@@ -259,7 +259,7 @@ async function createPersonalSession({
       }
       // NTKhang's fb-chat-api handles ISP-level redirects delivered as HTML
       // meta refresh. Follow only HTTPS Facebook/Messenger destinations.
-      const metaRefresh = /<meta\\s+http-equiv=["']?refresh["']?\\s+content=["']?\\s*0\\s*;\\s*url=([^"' >]+)["']?[^>]*>/i.exec(html);
+      const metaRefresh = /<meta\s+http-equiv=["']?refresh["']?\s+content=["']?\s*0\s*;\s*url=([^"' >]+)["']?[^>]*>/i.exec(html);
       if (metaRefresh && redirectCount < 5) {
         let target;
         try { target = new URL(metaRefresh[1].replace(/&amp;/g, "&"), currentUrl); } catch { target = null; }
