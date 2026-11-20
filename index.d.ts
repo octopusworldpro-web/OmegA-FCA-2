@@ -405,3 +405,21 @@ export interface FacebookThreadApi {
 }
 export const FACEBOOK_THREAD_DOC_IDS: Readonly<{ threadList: string; threadInfo: string; threadHistory: string; reaction: string }>;
 export function createFacebookThreadApi(options: { session: PersonalSession; webClient?: FacebookWebClient }): FacebookThreadApi;
+
+/** Encrypted session snapshots with verified backup preservation and corruption recovery. */
+export interface SessionGuardOptions {
+  filePath: string;
+  key: string | Buffer | Uint8Array;
+  getSession(): Record<string, unknown> | Promise<Record<string, unknown>>;
+  backupPath?: string;
+  onRecovery?: (event: Readonly<{ source: "backup" | "save"; restored: boolean; errorCode?: string }>) => void;
+}
+export interface SessionGuard {
+  saveNow(): Promise<string>;
+  load(): Record<string, unknown>;
+  start(intervalMs?: number): () => void;
+  stop(): void;
+  close(): void;
+  getPaths(): Readonly<{ filePath: string; backupPath: string }>;
+}
+export function createSessionGuard(options: SessionGuardOptions): SessionGuard;
