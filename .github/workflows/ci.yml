@@ -7,7 +7,7 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [main, public-package]
+    branches: [main, public-package, 'feat/**']
   pull_request:
     branches: [main]
 
