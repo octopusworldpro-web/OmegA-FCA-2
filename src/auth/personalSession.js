@@ -60,6 +60,27 @@ function extractFacebookTokens(html) {
   });
 }
 
+function extractRealtimeConfig(html) {
+  // Facebook embeds account-specific Messenger broker metadata in the
+  // authenticated home page. Treat it as untrusted input and validate it.
+  const patterns = [
+    /irisSeqID:"([^"]+)",appID:219994525426954,endpoint:"([^"]+)"/,
+    /"app_id":"219994525426954","endpoint":"([^"]+)","iris_seq_id":"([^"]+)"/,
+    /\["MqttWebConfig",\[\],\{fbid:"[0-9]+",appID:219994525426954,endpoint:"([^"]+)"/
+  ];
+  for (let i = 0; i < patterns.length; i++) {
+    const match = patterns[i].exec(html);
+    if (!match) continue;
+    const endpoint = (i === 1 ? match[1] : match[2] || match[1]).replace(/\\\//g, "/");
+    let url;
+    try { url = new URL(endpoint); } catch { continue; }
+    if (url.protocol !== "wss:" || url.hostname !== "edge-chat.facebook.com" || url.pathname !== "/chat") continue;
+    const sequence = i === 1 ? match[2] : (i === 2 ? null : match[1]);
+    return Object.freeze({ endpoint: url.toString(), region: url.searchParams.get("region"), lastSeqId: sequence });
+  }
+  return Object.freeze({ endpoint: null, region: null, lastSeqId: null });
+}
+
 function collectResponseCookies(response, requestUrl) {
   const raw = typeof response.headers?.getSetCookie === "function"
     ? response.headers.getSetCookie()
@@ -196,6 +217,7 @@ async function createPersonalSession({
 
     const pageUserId = extractIdentity(html);
     const pageTokens = extractFacebookTokens(html);
+    const realtime = extractRealtimeConfig(html);
     if (pageUserId && pageUserId !== userId) {
       throw sessionError("Facebook returned a different account than the supplied c_user session", "FCA_SESSION_IDENTITY_MISMATCH", "error");
     }
@@ -204,6 +226,7 @@ async function createPersonalSession({
       userId,
       state: "active",
       validatedAt: Date.now(),
+      realtime,
       getTokens() {
         if (closed) throw new Error("Facebook session is closed");
         return { ...pageTokens };
@@ -279,4 +302,4 @@ async function createPersonalSession({
   }
 }
 
-module.exports = { createPersonalSession, detectSessionChallenge, extractIdentity, extractFacebookTokens };
+module.exports = { createPersonalSession, detectSessionChallenge, extractIdentity, extractFacebookTokens, extractRealtimeConfig };
