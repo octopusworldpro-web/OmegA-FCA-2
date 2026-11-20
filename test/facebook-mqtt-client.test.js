@@ -137,5 +137,5 @@ test("session login requires an encrypted SessionGuard snapshot", async () => {
     fetchImpl: async () => response(),
     mqtt: { keepAlive: 0 }
   });
-  await assert.rejects(client.login({ mode: "session" }), /AppState is required unless an encrypted SessionGuard is configured/);
+  await assert.rejects(client.login({ mode: "session" }), error => error.code === "FCA_SESSION_GUARD_MISSING" && /No usable encrypted saved Facebook session/.test(error.message));
 });
