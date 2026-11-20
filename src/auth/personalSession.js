@@ -205,31 +205,73 @@ async function createPersonalSession({
 
   try {
     const bootstrapStartedAt = Date.now();
-    const bootstrapResponse = await fetchImpl(FACEBOOK_ORIGIN + "/", {
-      method: "GET",
-      redirect: "manual",
-      headers: {
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "accept-language": "en-US,en;q=0.9",
-        cookie: jar.getCookieHeader(FACEBOOK_ORIGIN + "/"),
-        "user-agent": userAgent
-      },
-      signal: controller.signal
-    });
-
-    const response = bootstrapResponse;
-    const { accepted: bootstrapCookies, deletions: bootstrapDeletions } = collectResponseCookies(response, new URL(FACEBOOK_ORIGIN + "/"));
-    if (bootstrapCookies.length) jar.setCookies(bootstrapCookies);
-    if (bootstrapDeletions.length) jar.deleteCookies(bootstrapDeletions);
-    emitDiagnostic({ phase: "response", request: { url: FACEBOOK_ORIGIN + "/", method: "GET" }, response: { status: response.status, contentType: response.headers?.get?.("content-type") || "", bodyBytes: Number(response.headers?.get?.("content-length") || 0) }, durationMs: Date.now() - bootstrapStartedAt });
-    if (response.status >= 500) {
-      throw sessionError("Facebook is temporarily unavailable while validating the session", "FCA_UPSTREAM_UNAVAILABLE", "error");
+    const safeFacebookHost = host => /(^|\\.)facebook\\.com$/i.test(host) || /(^|\\.)messenger\\.com$/i.test(host);
+    let currentUrl = new URL(FACEBOOK_ORIGIN + "/");
+    let response;
+    let html = "";
+    let redirectCount = 0;
+    for (;;) {
+      response = await fetchImpl(currentUrl, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "en-US,en;q=0.9",
+          cookie: jar.getCookieHeader(currentUrl),
+          "user-agent": userAgent
+        },
+        signal: controller.signal
+      });
+      const { accepted, deletions } = collectResponseCookies(response, currentUrl);
+      if (accepted.length) jar.setCookies(accepted);
+      if (deletions.length) jar.deleteCookies(deletions);
+      emitDiagnostic({
+        phase: "response",
+        request: { url: currentUrl.origin + currentUrl.pathname, method: "GET" },
+        response: { status: response.status, contentType: response.headers?.get?.("content-type") || "", bodyBytes: Number(response.headers?.get?.("content-length") || 0) },
+        durationMs: Date.now() - bootstrapStartedAt,
+        redirectCount
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers?.get?.("location") || "";
+        if (/checkpoint|challenge/i.test(location) || /login\\.php|\\/login(?:[/?]|$)/i.test(location)) break;
+        if (!location || redirectCount >= 5) {
+          throw sessionError("Facebook returned an unexpected redirect while validating the session", "FCA_UNEXPECTED_REDIRECT", "error");
+        }
+        let target;
+        try { target = new URL(location, currentUrl); } catch {
+          throw sessionError("Facebook returned an invalid redirect while validating the session", "FCA_UNEXPECTED_REDIRECT", "error");
+        }
+        if (target.protocol !== "https:" || !safeFacebookHost(target.hostname) || target.username || target.password) {
+          throw sessionError("Facebook redirect left the trusted session domain", "FCA_UNEXPECTED_REDIRECT", "error");
+        }
+        currentUrl = target;
+        redirectCount++;
+        continue;
+      }
+      const declaredLength = Number(response.headers?.get?.("content-length") || 0);
+      if (declaredLength > MAX_RESPONSE_BYTES) {
+        throw sessionError("Facebook session response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
+      }
+      html = await response.text();
+      if (Buffer.byteLength(html, "utf8") > MAX_RESPONSE_BYTES) {
+        throw sessionError("Facebook session response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
+      }
+      // NTKhang's fb-chat-api handles ISP-level redirects delivered as HTML
+      // meta refresh. Follow only HTTPS Facebook/Messenger destinations.
+      const metaRefresh = /<meta\\s+http-equiv=["']?refresh["']?\\s+content=["']?\\s*0\\s*;\\s*url=([^"' >]+)["']?[^>]*>/i.exec(html);
+      if (metaRefresh && redirectCount < 5) {
+        let target;
+        try { target = new URL(metaRefresh[1].replace(/&amp;/g, "&"), currentUrl); } catch { target = null; }
+        if (target && target.protocol === "https:" && safeFacebookHost(target.hostname) && !target.username && !target.password) {
+          currentUrl = target;
+          redirectCount++;
+          continue;
+        }
+      }
+      break;
     }
-    const declaredLength = Number(response.headers?.get?.("content-length") || 0);
-    if (declaredLength > MAX_RESPONSE_BYTES) {
-      throw sessionError("Facebook session response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
-    }
-    const html = await response.text();
+    emitDiagnostic({ phase: "bootstrap_complete", redirectCount, finalHost: currentUrl.hostname, finalPath: currentUrl.pathname });
     if (Buffer.byteLength(html, "utf8") > MAX_RESPONSE_BYTES) {
       throw sessionError("Facebook session response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
     }
