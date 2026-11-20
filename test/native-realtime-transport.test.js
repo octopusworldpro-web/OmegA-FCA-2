@@ -138,3 +138,30 @@ test("aborts a pending socket factory without waiting for its promise", async ()
   controller.abort(Object.assign(new Error("cancelled"), { code: "FCA_WS_ABORTED" }));
   await assert.rejects(pending, { code: "FCA_WS_ABORTED" });
 });
+
+
+test("ignores stale message handlers from a superseded socket generation", async () => {
+  const sockets = [];
+  const transport = createNativeRealtimeTransport({
+    url: "wss://fixture.invalid/realtime",
+    socketFactory: async () => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket;
+    },
+    protocol: makeProtocol()
+  });
+  const firstDriver = await transport.connect();
+  const staleHandler = sockets[0].listeners("message").at(-1);
+  const events = [];
+  firstDriver.listen((error, event) => { if (!error) events.push(event); });
+  await transport.disconnect();
+
+  const secondDriver = await transport.connect();
+  secondDriver.listen((error, event) => { if (!error) events.push(event); });
+  staleHandler(Buffer.from("stale-frame"), true);
+  sockets[1].emit("message", Buffer.from("fresh-frame"), true);
+
+  assert.deepEqual(events, [{ name: "fixture", args: "fresh-frame" }]);
+  await transport.disconnect();
+});
