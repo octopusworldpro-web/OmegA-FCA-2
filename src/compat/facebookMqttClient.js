@@ -31,6 +31,7 @@ function createFacebookMqttClient(options = {}) {
     maxPendingRequests,
     mqtt,
     onDiagnostic,
+    sessionGuard,
     reconnect,
     license,
     requireLicense,
@@ -65,7 +66,8 @@ function createFacebookMqttClient(options = {}) {
         requestTimeoutMs,
         maxPendingRequests,
         mqtt,
-        onDiagnostic
+        onDiagnostic,
+        sessionGuard
       });
     }
   });
