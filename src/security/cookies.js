@@ -68,7 +68,8 @@ function parseCookieHeader(header) {
     if (index <= 0) throw new TypeError("Malformed cookie header");
     return { key: part.slice(0, index).trim(), value: part.slice(index + 1).trim(), domain: "facebook.com", path: "/", hostOnly: true };
   });
-  // A raw Cookie header has no host-only metadata. Treat imported Facebook\n  // cookies as domain-scoped so they reach www.facebook.com as expected.\n  return normalizeCookies(entries.map(cookie => ({ ...cookie, hostOnly: false })));
+  // A raw Cookie header has no host-only metadata. Treat imported Facebook cookies as domain-scoped so they reach www.facebook.com as expected.
+  return normalizeCookies(entries.map(cookie => ({ ...cookie, hostOnly: false })));
 }
 
 function parseNetscapeCookies(text) {
