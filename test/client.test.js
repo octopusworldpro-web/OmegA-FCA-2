@@ -178,3 +178,51 @@ test("client rejects overlapping login attempts", async () => {
   await first;
   await client.logout();
 });
+
+test("client preserves safe realtime transport failure codes after AppState validation", async () => {
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => {
+      const error = new Error("provider detail must not be exposed");
+      error.code = "FCA_MQTT_CONNACK_REJECTED";
+      error.retryable = false;
+      throw error;
+    }
+  });
+  await assert.rejects(
+    client.login({ mode: "appstate", appState: [
+      { key: "c_user", value: "123456", domain: "facebook.com" },
+      { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+    ] }),
+    error => {
+      assert.equal(error.code, "FCA_MQTT_CONNACK_REJECTED");
+      assert.match(error.message, /session was accepted, but Messenger realtime setup failed/);
+      assert.equal(error.retryable, false);
+      assert.equal(error.message.includes("provider detail"), false);
+      return true;
+    }
+  );
+});
+
+test("client does not expose arbitrary provider error codes or messages", async () => {
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => {
+      const error = new Error("private cookie value");
+      error.code = "PRIVATE_PROVIDER_SECRET";
+      throw error;
+    }
+  });
+  await assert.rejects(
+    client.login({ mode: "appstate", appState: [
+      { key: "c_user", value: "123456", domain: "facebook.com" },
+      { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+    ] }),
+    error => {
+      assert.equal(error.code, "FCA_AUTHENTICATION_FAILED");
+      assert.equal(error.message, "Authentication failed; inspect provider diagnostics securely");
+      assert.equal(error.message.includes("private cookie value"), false);
+      return true;
+    }
+  );
+});
