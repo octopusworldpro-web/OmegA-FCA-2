@@ -11,7 +11,7 @@ This matrix separates what the current OmegA-FCA facade exposes from what still 
 
 | GoatBot expectation | Current OmegA-FCA status | Notes |
 |---|---|---|
-| `login({ appState }, options, callback)` | Native AppState path wired | `createGoatBotLogin` maps AppState arrays to `createFacebookMqttClient`; native HTTPS session validation and MQTT setup run before callback success. Real-account acceptance is still pending. |
+| `login({ appState }, options, callback)` / `login({ mode: "session" })` | Native AppState + encrypted saved-session restore | `createGoatBotLogin` maps AppState arrays to `createFacebookMqttClient`; explicit `mode: "session"` restores an encrypted snapshot when SessionGuard is configured. Native HTTPS validation and MQTT setup run before callback success. Real-account acceptance is still pending. |
 | `getCurrentUserID()` | Conditional | Exposed after login; returns the driver identity converted to a string, or null. |
 | `listenMqtt(callback)` | Native adapter wired | Adapts the native driver's `listen` to error-first `(error, event)` and emits a `ready` event after successful MQTT setup. Live event compatibility remains unverified. |
 | `stopListening(callback?)` | Implemented at facade boundary | Detaches the active listener and invokes an optional callback. |
