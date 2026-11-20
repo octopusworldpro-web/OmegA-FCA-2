@@ -56,3 +56,16 @@ This is a native code-path integration milestone, not live acceptance. The
 Facebook-specific MQTT handshake, task schemas, event deltas, and private web
 action endpoints remain experimental until an authorized live account test
 proves login readiness, message receive/send, and recovery.
+
+
+## Integration audit: GoatBot `fca-migration-cleanup` (2026-11-21)
+
+A direct read of the target branch found integration gaps that must be closed before claiming the new driver is active in GoatBot:
+
+- GoatBot's `package.json` currently pins `@nirzon-islam/omega-fca` to `0.1.6-rc.2`. That is the published package from the original OmegA-FCA repository, not this FCA-2 feature branch. Changes in this PR do not reach the running bot until they are synchronized/released and the GoatBot dependency plus lockfile are deliberately updated.
+- `bot/login/omegaFca.js` creates the client without a `sessionGuard` configuration or an owner-managed encryption key.
+- `bot/login/login.js` calls `api.sessionGuard(account.txt, { interval, debounce })`. The native SessionGuard instead requires a separately configured encrypted snapshot path and explicit key; it must not overwrite plaintext `account.txt`. The caller must use `api.sessionGuard()` only after configuring the guard in the client factory, and must await `api.stopSessionGuard()` during shutdown/recovery.
+- The current GoatBot startup path requires `account.txt` and always supplies AppState. To use encrypted restart recovery, the integration must fall back to `client.login({ mode: "session" })` when the owner-provided AppState file is absent, while preserving the explicit account-ID check and fresh-session recovery path.
+- The current GoatBot config file tracked on the reviewed branch contains plaintext third-party credentials/secrets. Rotate those values, remove them from the tracked config, and move runtime values into deployment secrets. Removing them from the latest file alone does not purge Git history.
+
+These are release blockers, not claims of completed integration. Keep the GoatBot dependency unchanged until this branch's CI and the synchronized package release are verified.
