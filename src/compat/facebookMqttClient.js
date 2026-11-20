@@ -48,11 +48,11 @@ function createFacebookMqttClient(options = {}) {
     requireLicense,
     onLicenseError,
     authenticate: ({ mode, credentials }) => {
-      if (mode !== "appstate") {
-        throw new TypeError("Native Messenger client currently supports AppState login only");
+      if (mode !== "appstate" && mode !== "session") {
+        throw new TypeError("Native Messenger client supports AppState or encrypted SessionGuard login");
       }
       return createFacebookMqttDriver({
-        appState: credentials,
+        appState: mode === "appstate" ? credentials : undefined,
         socketFactory,
         fetchImpl,
         userAgent,
