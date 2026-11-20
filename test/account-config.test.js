@@ -39,7 +39,7 @@ test("loads AppState JSON as backward-compatible fallback", () => withRoot(root 
   fs.writeFileSync(path.join(root, "appstate.json"), JSON.stringify(state));
   const config = loadAccountConfig({ cwd: root, env: {} });
   assert.equal(config.mode, "appstate");
-  assert.deepEqual(config.appState, state.map(cookie => ({ ...cookie, path: "/", hostOnly: true, secure: false, httpOnly: false })));
+  assert.deepEqual(config.appState, state.map(cookie => ({ ...cookie, path: "/", hostOnly: false, secure: false, httpOnly: false })));
 }));
 
 test("does not read credential config while loading AppState", () => withRoot(root => {
