@@ -27,6 +27,22 @@ OmegA-FCA is the Facebook integration library maintained under the **OmegA Bot**
 - Separate official Meta Messenger Page transport (not a personal-account replacement).
 - TypeScript declarations, signed update-manifest verification, optional Ed25519 licensing.
 
+## Automatic encrypted SessionGuard
+
+The first-party native MQTT driver can persist the currently authenticated AppState without requiring a separate manual guard lifecycle. This is opt-in and requires an owner-managed encryption key; the library never generates or writes the key.
+
+```js
+const client = createFacebookMqttClient({
+  sessionGuard: {
+    filePath: "./private/facebook-session.enc",
+    key: process.env.FCA_SESSION_KEY, // exactly 64 hex chars or a 32-byte Buffer
+    intervalMs: 60_000
+  }
+});
+```
+
+After MQTT setup succeeds, the driver writes an encrypted snapshot immediately and then periodically. It keeps a verified encrypted backup, exposes `api.sessionGuard()` for safe path/save access, and `api.stopSessionGuard()` for a final save. Normal logout also stops the timer and attempts a final save. Keep the key outside the repository and backups; losing the key makes the encrypted snapshots unrecoverable. Do not put it in `config.json`, `account.txt`, logs, or CI output.
+
 ## GoatBot account configuration
 
 The current authentication phase is **AppState-only**. Email/password and username/password login are deferred and are not loaded from configuration or environment variables.
