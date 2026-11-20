@@ -22,7 +22,8 @@ test("uses the account sequence cursor in the initial Messenger sync queue", asy
   let subackPacketId;
   await configured.protocol.subscribe(socket, {
     async waitForFrame() {
-      subackPacketId = sent[0].readUInt16BE(2);
+      const remaining = mqtt.decodeRemainingLength(sent[0]);
+      subackPacketId = sent[0].readUInt16BE(remaining.offset);
       return Buffer.from([0x90, 0x03, subackPacketId >> 8, subackPacketId & 0xff, 0x01]);
     }
   });
