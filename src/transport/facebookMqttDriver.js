@@ -49,10 +49,25 @@ async function createFacebookMqttDriver({
     let activeAppState = appState;
     let restoredSnapshot = null;
     if (!Array.isArray(activeAppState) || activeAppState.length === 0) {
-      if (!guard) throw new TypeError("AppState is required unless an encrypted SessionGuard is configured");
-      restoredSnapshot = guard.load();
+      if (!guard) {
+        const error = new Error("No encrypted saved session is configured; supply AppState or configure SessionGuard");
+        error.code = "FCA_SESSION_GUARD_MISSING";
+        error.retryable = false;
+        throw error;
+      }
+      try {
+        restoredSnapshot = guard.load();
+      } catch (cause) {
+        const error = new Error("No usable encrypted saved session was found; supply a fresh AppState or repair the SessionGuard snapshot");
+        error.code = cause?.code === "ENOENT" ? "FCA_SESSION_SNAPSHOT_MISSING" : "FCA_SESSION_RESTORE_FAILED";
+        error.retryable = false;
+        throw error;
+      }
       if (!Array.isArray(restoredSnapshot.appState) || restoredSnapshot.appState.length === 0) {
-        throw new TypeError("Encrypted SessionGuard snapshot does not contain an AppState cookie array");
+        const error = new Error("Encrypted SessionGuard snapshot does not contain an AppState cookie array");
+        error.code = "FCA_SESSION_RESTORE_FAILED";
+        error.retryable = false;
+        throw error;
       }
       activeAppState = restoredSnapshot.appState;
     }
