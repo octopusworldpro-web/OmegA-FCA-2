@@ -7,7 +7,7 @@ const { importBrowserSession } = require("../src/auth/browserSessionImport");
 
 function safeMessage(error) {
   return String(error && error.message || "Browser session import failed")
-    .replace(/(c_user|xs|cookie|password|token|secret)(\\s*[=:]\\s*)[^\\s,;]+/ig, "$1$2[REDACTED]");
+    .replace(/(c_user|xs|cookie|password|token|secret)(\s*[=:]\s*)[^\s,;]+/ig, "$1$2[REDACTED]");
 }
 
 async function main() {
