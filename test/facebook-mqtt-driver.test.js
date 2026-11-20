@@ -3,6 +3,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { createFacebookMqttDriver } = require("../src/transport/facebookMqttDriver");
 const mqtt = require("../src/transport/mqtt311Codec");
 
@@ -58,4 +61,43 @@ test("integrated driver validates AppState, authenticates MQTT and exposes an FC
 
 test("integrated driver requires an injected WebSocket implementation", async () => {
   await assert.rejects(createFacebookMqttDriver({ appState }), /socketFactory is required/);
+});
+
+
+test("native driver automatically snapshots AppState when SessionGuard is configured", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-guard-"));
+  const filePath = path.join(directory, "session.enc");
+  const key = "a".repeat(64);
+  let driver;
+  try {
+    driver = await createFacebookMqttDriver({
+      appState,
+      fetchImpl: async () => htmlResponse(),
+      socketFactory: () => new FakeWebSocket(),
+      mqtt: { keepAlive: 0 },
+      sessionGuard: { filePath, key, intervalMs: 60_000 }
+    });
+    const paths = driver.sessionGuard();
+    assert.equal(paths.filePath, filePath);
+    assert.equal(fs.existsSync(filePath), true);
+    const saved = require("../src/security/sessionStore").loadSession(filePath, key);
+    assert.equal(saved.userId, "123456789012345");
+    assert.deepEqual(saved.appState, appState);
+    assert.equal(typeof driver.stopSessionGuard, "function");
+    assert.equal(await driver.stopSessionGuard(), true);
+    assert.equal(driver.sessionGuard(), null);
+  } finally {
+    if (driver) await driver.disconnect();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("native driver rejects SessionGuard without an explicit encryption key", async () => {
+  await assert.rejects(createFacebookMqttDriver({
+    appState,
+    fetchImpl: async () => htmlResponse(),
+    socketFactory: () => new FakeWebSocket(),
+    mqtt: { keepAlive: 0 },
+    sessionGuard: { filePath: "/tmp/omega-session.enc" }
+  }), /explicit 32-byte\/64-hex encryption key/);
 });
