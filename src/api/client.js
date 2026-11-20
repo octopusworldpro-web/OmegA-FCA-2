@@ -105,11 +105,22 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
           // cookies, challenge answers, or tokens. Classify privately, then
           // expose only a fixed safe error to the application.
           const sessionState = classifySessionState(caught);
+          // Keep authentication failures distinct from failures that occur
+          // after AppState validation (for example MQTT CONNACK/SUBACK or
+          // WebSocket setup). Only allowlist stable, non-secret FCA codes;
+          // never forward provider messages or arbitrary error properties.
+          const safeProviderCode = typeof caught?.code === "string" &&
+            /^FCA_(?:MQTT_[A-Z0-9_]+|WS_[A-Z0-9_]+|SESSION_[A-Z0-9_]+|CHALLENGE_LIMIT|UPSTREAM_UNAVAILABLE|RESPONSE_TOO_LARGE)$/.test(caught.code)
+            ? caught.code : null;
+          const isRealtimeFailure = safeProviderCode &&
+            (safeProviderCode.startsWith("FCA_MQTT_") || safeProviderCode.startsWith("FCA_WS_"));
           const error = new Error(sessionState === "checkpoint"
             ? "Facebook requires the account owner to complete a checkpoint"
             : sessionState === "logged_out"
               ? "The Facebook session has expired; supply a fresh authorized AppState"
-              : "Authentication failed; inspect provider diagnostics securely");
+              : isRealtimeFailure
+                ? "Facebook session was accepted, but Messenger realtime setup failed (" + safeProviderCode + ")"
+                : "Authentication failed; inspect provider diagnostics securely");
           if (sessionState === "checkpoint") {
             error.code = "FCA_CHECKPOINT_REQUIRED";
             error.sessionState = sessionState;
@@ -119,8 +130,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
             error.sessionState = sessionState;
             error.retryable = false;
           } else {
-            error.code = caught?.code === "FCA_CHALLENGE_LIMIT"
-              ? "FCA_CHALLENGE_LIMIT" : "FCA_AUTHENTICATION_FAILED";
+            error.code = safeProviderCode || "FCA_AUTHENTICATION_FAILED";
             error.retryable = typeof caught?.retryable === "boolean" ? caught.retryable : true;
           }
           lastConnectError = error;
