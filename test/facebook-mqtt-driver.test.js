@@ -92,6 +92,32 @@ test("native driver automatically snapshots AppState when SessionGuard is config
   }
 });
 
+test("legacy GoatBot account.txt SessionGuard call activates only the separate encrypted file", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-legacy-guard-"));
+  const accountPath = path.join(directory, "account.txt");
+  const encryptedPath = path.join(directory, "private", "facebook-session.enc");
+  const originalAccount = JSON.stringify(appState);
+  fs.writeFileSync(accountPath, originalAccount, "utf8");
+  let driver;
+  try {
+    driver = await createFacebookMqttDriver({
+      appState,
+      fetchImpl: async () => htmlResponse(),
+      socketFactory: () => new FakeWebSocket(),
+      mqtt: { keepAlive: 0 },
+      sessionGuard: { filePath: encryptedPath, key: "b".repeat(64), intervalMs: 60_000 }
+    });
+    const configured = driver.sessionGuard(accountPath, { interval: 180_000, debounce: 30_000 });
+    assert.equal(configured.filePath, encryptedPath);
+    assert.equal(fs.readFileSync(accountPath, "utf8"), originalAccount);
+    assert.equal(fs.existsSync(encryptedPath), true);
+    assert.notEqual(fs.readFileSync(encryptedPath, "utf8"), originalAccount);
+  } finally {
+    if (driver) await driver.disconnect();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("native driver rejects SessionGuard without an explicit encryption key", async () => {
   await assert.rejects(createFacebookMqttDriver({
     appState,
