@@ -1,5 +1,6 @@
 "use strict";
 
+const path = require("node:path");
 const { createPersonalSession } = require("../auth/personalSession");
 const { createSessionGuard } = require("../security/sessionGuard");
 const { createFacebookMqttProtocol } = require("./facebookMqttProtocol");
@@ -101,7 +102,14 @@ async function createFacebookMqttDriver({
       ...threadApi,
       getCurrentUserID: () => session.userId,
       getSessionState: () => session.state,
-      sessionGuard: () => guard ? Object.freeze({ ...guard.getPaths(), saveNow: guard.saveNow }) : null,
+      sessionGuard: requestedPath => {
+        if (!guard) throw new Error("SessionGuard is not configured; supply sessionGuard.filePath and sessionGuard.key when creating the client");
+        const paths = guard.getPaths();
+        if (requestedPath && path.resolve(requestedPath) !== paths.filePath) {
+          throw new Error("SessionGuard path is configured separately; use the encrypted snapshot path, not account.txt");
+        }
+        return Object.freeze({ ...paths, saveNow: guard.saveNow });
+      },
       stopSessionGuard,
       disconnect: async () => {
         if (closed) return;
