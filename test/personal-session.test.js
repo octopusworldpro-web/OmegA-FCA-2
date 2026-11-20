@@ -176,3 +176,52 @@ test("cookie normalization accepts Messenger subdomains", () => {
   const { normalizeCookies } = require("../src/security/cookies");
   assert.equal(normalizeCookies([{ key: "sid", value: "abc", domain: ".www.messenger.com" }])[0].domain, "www.messenger.com");
 });
+
+
+test("personal session follows safe same-site HTTP redirects and retains rotated cookies", async () => {
+  const requests = [];
+  const session = await createPersonalSession({
+    appState,
+    fetchImpl: async (url, options) => {
+      requests.push({ url: String(url), cookie: options.headers.cookie });
+      if (requests.length === 1) return response({
+        status: 302,
+        location: "https://m.facebook.com/",
+        setCookies: ["route=one; Domain=.facebook.com; Path=/; Secure"]
+      });
+      return response({ html: '<html><script>{"USER_ID":"123456789012345"}</script>Home</html>' });
+    }
+  });
+  assert.equal(requests.length, 2);
+  assert.equal(new URL(requests[1].url).hostname, "m.facebook.com");
+  assert.match(requests[1].cookie, /route=one/);
+  assert.equal(session.userId, "123456789012345");
+  session.close();
+});
+
+test("personal session follows safe Facebook meta-refresh redirects", async () => {
+  const urls = [];
+  const session = await createPersonalSession({
+    appState,
+    fetchImpl: async url => {
+      urls.push(String(url));
+      if (urls.length === 1) return response({
+        html: '<html><meta http-equiv="refresh" content="0;url=https://www.facebook.com/home.php"></html>'
+      });
+      return response({ html: '<html><script>{"USER_ID":"123456789012345"}</script>Home</html>' });
+    }
+  });
+  assert.equal(urls.length, 2);
+  assert.equal(new URL(urls[1]).pathname, "/home.php");
+  session.close();
+});
+
+test("personal session refuses redirects outside Facebook/Messenger HTTPS", async () => {
+  await assert.rejects(
+    createPersonalSession({
+      appState,
+      fetchImpl: async () => response({ status: 302, location: "https://evil.example/collect" })
+    }),
+    error => error.code === "FCA_UNEXPECTED_REDIRECT"
+  );
+});
