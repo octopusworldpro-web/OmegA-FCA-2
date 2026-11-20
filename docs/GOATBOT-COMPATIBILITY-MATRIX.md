@@ -16,7 +16,7 @@ This matrix separates what the current OmegA-FCA facade exposes from what still 
 | `listenMqtt(callback)` | Native adapter wired | Adapts the native driver's `listen` to error-first `(error, event)` and emits a `ready` event after successful MQTT setup. Live event compatibility remains unverified. |
 | `stopListening(callback?)` | Implemented at facade boundary | Detaches the active listener and invokes an optional callback. |
 | `sessionGuard(path, options)` | Encrypted native-driver guard available via configuration | `createFacebookMqttClient({ sessionGuard: { filePath, key, intervalMs } })` enables immediate/periodic encrypted AppState snapshots and a verified backup. The key must be supplied securely by the owner; no key is generated or committed. |
-| `stopSessionGuard()` | Pass-through only | Exposed only if supplied by the driver. |
+| `stopSessionGuard()` | Implemented by native driver | Stops periodic snapshots, performs a final encrypted save, and closes the guard. Normal client logout also runs this cleanup. |
 | `setOptions(options)` | Pass-through only | Exposed only if supplied by the driver. |
 | `e2ee.isConnected()` | Not implemented | No E2EE implementation in this branch. |
 
