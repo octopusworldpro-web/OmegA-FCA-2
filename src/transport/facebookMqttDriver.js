@@ -108,9 +108,25 @@ async function createFacebookMqttDriver({
       const active = guard;
       guard = null;
       active.stop();
-      try { await active.saveNow(); }
-      finally { active.close(); }
-      return true;
+      try {
+        await active.saveNow();
+        return true;
+      } catch (error) {
+        // GoatBot's historical caller does not await this method in every
+        // shutdown/recovery path. Resolve safely rather than leaking an
+        // unhandled rejection while still closing the guard deterministically.
+        try {
+          if (typeof sessionGuardOptions.onRecovery === "function") {
+            sessionGuardOptions.onRecovery(Object.freeze({
+              source: "save", restored: false,
+              errorCode: error.code || "FCA_SESSION_GUARD_SAVE_FAILED"
+            }));
+          }
+        } catch {}
+        return false;
+      } finally {
+        active.close();
+      }
     };
     return Object.freeze({
       ...driver,
