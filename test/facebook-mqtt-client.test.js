@@ -105,3 +105,37 @@ test("first-party client exposes configured automatic SessionGuard lifecycle", a
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test("first-party client can restore and reconnect using encrypted SessionGuard state", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-client-restore-"));
+  const sessionGuard = { filePath: path.join(directory, "account.enc"), key: "c".repeat(64), intervalMs: 60_000 };
+  const createClientInstance = () => createFacebookMqttClient({
+    socketFactory: () => new FakeSocket(),
+    fetchImpl: async () => response(),
+    mqtt: { keepAlive: 0 },
+    sessionGuard
+  });
+  try {
+    const first = createClientInstance();
+    const firstApi = await first.login({ mode: "appstate", appState });
+    assert.equal(firstApi.getCurrentUserID(), "123456789012345");
+    await first.logout();
+
+    const second = createClientInstance();
+    const restoredApi = await second.login({ mode: "session" });
+    assert.equal(restoredApi.getCurrentUserID(), "123456789012345");
+    await second.logout();
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("session login requires an encrypted SessionGuard snapshot", async () => {
+  const client = createFacebookMqttClient({
+    socketFactory: () => new FakeSocket(),
+    fetchImpl: async () => response(),
+    mqtt: { keepAlive: 0 }
+  });
+  await assert.rejects(client.login({ mode: "session" }), /AppState is required unless an encrypted SessionGuard is configured/);
+});
