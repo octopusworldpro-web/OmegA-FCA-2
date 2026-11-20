@@ -118,10 +118,16 @@ async function createFacebookMqttDriver({
       getCurrentUserID: () => session.userId,
       getSessionState: () => session.state,
       sessionGuard: requestedPath => {
-        if (!guard) throw new Error("SessionGuard is not configured; supply sessionGuard.filePath and sessionGuard.key when creating the client");
+        if (!guard) throw new Error("Encrypted SessionGuard is not configured; set FCA_SESSION_FILE and FCA_SESSION_KEY or pass sessionGuard.filePath/key");
         const paths = guard.getPaths();
         if (requestedPath && path.resolve(requestedPath) !== paths.filePath) {
-          throw new Error("SessionGuard path is configured separately; use the encrypted snapshot path, not account.txt");
+          // GoatBot's established API calls sessionGuard(account.txt, ...).
+          // Treat that path as a legacy activation signal only: the encrypted
+          // snapshot always remains at the separately configured FCA path.
+          // Never read, truncate, replace, or write encrypted bytes to account.txt.
+          if (path.basename(path.resolve(requestedPath)).toLowerCase() !== "account.txt") {
+            throw new Error("SessionGuard uses its separately configured encrypted snapshot path");
+          }
         }
         return Object.freeze({ ...paths, saveNow: guard.saveNow });
       },
