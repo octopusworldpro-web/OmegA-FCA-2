@@ -2,6 +2,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { EventEmitter } = require("node:events");
 const { createFacebookMqttClient } = require("../src/compat/facebookMqttClient");
 const mqtt = require("../src/transport/mqtt311Codec");
@@ -78,4 +81,27 @@ test("first-party client logs in with AppState and exposes callback-compatible M
 
 test("first-party client supplies its package-managed WebSocket implementation by default", () => {
   assert.doesNotThrow(() => createFacebookMqttClient());
+});
+
+
+test("first-party client exposes configured automatic SessionGuard lifecycle", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-client-guard-"));
+  const filePath = path.join(directory, "account.enc");
+  const client = createFacebookMqttClient({
+    socketFactory: () => new FakeSocket(),
+    fetchImpl: async () => response(),
+    mqtt: { keepAlive: 0 },
+    sessionGuard: { filePath, key: "b".repeat(64), intervalMs: 60_000 }
+  });
+  try {
+    const api = await client.login({ mode: "appstate", appState });
+    assert.equal(typeof api.sessionGuard, "function");
+    assert.equal(api.sessionGuard().filePath, filePath);
+    assert.equal(typeof api.stopSessionGuard, "function");
+    assert.equal(await api.stopSessionGuard(), true);
+    await client.logout();
+  } finally {
+    await client.logout();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
