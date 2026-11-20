@@ -36,6 +36,22 @@ test("normalizes reply, reaction, unsend, typing, read and presence delta classe
   assert.equal(normalizeMessengerDelta({ class: "FutureDelta" }).type, "unknown_delta");
 });
 
+test("normalizes numeric Facebook identifiers to strings", () => {
+  const result = normalizeMessengerDelta({
+    class: "NewMessage",
+    messageMetadata: {
+      messageId: 1234567890123,
+      actorFbId: 123456789,
+      threadKey: { threadFbId: 987654321 }
+    },
+    body: "numeric ids"
+  });
+  assert.equal(result.messageID, "1234567890123");
+  assert.equal(result.senderID, "123456789");
+  assert.equal(result.threadID, "987654321");
+  assert.equal(result.isGroup, true);
+});
+
 test("extracts bounded delta arrays and known sync cursor fields", () => {
   const result = parseMessengerSyncPayload({
     deltas: [{ class: "NewMessage", body: "hi" }],
