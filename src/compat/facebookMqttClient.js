@@ -11,7 +11,7 @@ function defaultSocketFactory({ url, protocols, headers } = {}) {
 }
 
 /**
- * Creates the first-party AppState-only personal Messenger client.
+ * Creates the first-party AppState and encrypted-SessionGuard personal Messenger client.
  * The package owns its WebSocket implementation; tests and advanced users
  * may still inject a compatible socketFactory.
  */
