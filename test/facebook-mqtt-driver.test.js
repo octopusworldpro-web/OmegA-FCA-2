@@ -85,7 +85,7 @@ test("native driver automatically snapshots AppState when SessionGuard is config
     assert.deepEqual(saved.appState, appState);
     assert.equal(typeof driver.stopSessionGuard, "function");
     assert.equal(await driver.stopSessionGuard(), true);
-    assert.equal(driver.sessionGuard(), null);
+    assert.throws(() => driver.sessionGuard(), /SessionGuard is not configured/);
   } finally {
     if (driver) await driver.disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
