@@ -26,9 +26,19 @@ async function createFacebookMqttDriver({
   try {
     if (sessionGuardOptions != null) {
       if (!sessionGuardOptions || typeof sessionGuardOptions !== "object" ||
-          typeof sessionGuardOptions.filePath !== "string" ||
+          typeof sessionGuardOptions.filePath !== "string" || !sessionGuardOptions.filePath.trim() ||
           !(typeof sessionGuardOptions.key === "string" || Buffer.isBuffer(sessionGuardOptions.key) || sessionGuardOptions.key instanceof Uint8Array)) {
         throw new TypeError("sessionGuard requires filePath and an explicit 32-byte/64-hex encryption key");
+      }
+      const keyIsValid = typeof sessionGuardOptions.key === "string"
+        ? /^[a-f0-9]{64}$/i.test(sessionGuardOptions.key)
+        : sessionGuardOptions.key.byteLength === 32;
+      if (!keyIsValid) throw new TypeError("Session encryption key must be 32 bytes or exactly 64 hexadecimal characters");
+      const accountFile = path.resolve(process.cwd(), "account.txt");
+      const encryptedFile = path.resolve(sessionGuardOptions.filePath);
+      const backupFile = path.resolve(sessionGuardOptions.backupPath || encryptedFile + ".bak");
+      if (encryptedFile === accountFile || backupFile === accountFile) {
+        throw new TypeError("Encrypted SessionGuard files must be separate from GoatBot account.txt");
       }
       guard = createSessionGuard({
         filePath: sessionGuardOptions.filePath,
