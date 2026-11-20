@@ -18,11 +18,43 @@ async function createFacebookMqttDriver({
   mqtt = {}, onDiagnostic, sessionGuard: sessionGuardOptions
 } = {}) {
   if (typeof socketFactory !== "function") throw new TypeError("socketFactory is required");
-  const session = await createPersonalSession({ appState, fetchImpl, userAgent, timeoutMs, onDiagnostic });
+  let session = null;
   let closed = false;
   let transport;
   let guard = null;
   try {
+    if (sessionGuardOptions != null) {
+      if (!sessionGuardOptions || typeof sessionGuardOptions !== "object" ||
+          typeof sessionGuardOptions.filePath !== "string" ||
+          !(typeof sessionGuardOptions.key === "string" || Buffer.isBuffer(sessionGuardOptions.key) || sessionGuardOptions.key instanceof Uint8Array)) {
+        throw new TypeError("sessionGuard requires filePath and an explicit 32-byte/64-hex encryption key");
+      }
+      guard = createSessionGuard({
+        filePath: sessionGuardOptions.filePath,
+        backupPath: sessionGuardOptions.backupPath,
+        key: sessionGuardOptions.key,
+        onRecovery: sessionGuardOptions.onRecovery,
+        getSession: () => {
+          if (!session) throw new Error("Facebook session is not initialized");
+          return {
+            version: 1,
+            userId: session.userId,
+            appState: session.getAppState(),
+            savedAt: Date.now()
+          };
+        }
+      });
+    }
+    let activeAppState = appState;
+    if (!Array.isArray(activeAppState) || activeAppState.length === 0) {
+      if (!guard) throw new TypeError("AppState is required unless an encrypted SessionGuard is configured");
+      const restored = guard.load();
+      if (!Array.isArray(restored.appState) || restored.appState.length === 0) {
+        throw new TypeError("Encrypted SessionGuard snapshot does not contain an AppState cookie array");
+      }
+      activeAppState = restored.appState;
+    }
+    session = await createPersonalSession({ appState: activeAppState, fetchImpl, userAgent, timeoutMs, onDiagnostic });
     const protocolConfig = createFacebookMqttProtocol({
       ...mqtt, userId: session.userId,
       url: mqtt.url || session.realtime.endpoint || undefined,
@@ -42,24 +74,7 @@ async function createFacebookMqttDriver({
 
     // Session persistence is opt-in and requires an explicit owner-managed key.
     // Never generate a key here: deployments must store it outside source control.
-    if (sessionGuardOptions != null) {
-      if (!sessionGuardOptions || typeof sessionGuardOptions !== "object" ||
-          typeof sessionGuardOptions.filePath !== "string" ||
-          !(typeof sessionGuardOptions.key === "string" || Buffer.isBuffer(sessionGuardOptions.key) || sessionGuardOptions.key instanceof Uint8Array)) {
-        throw new TypeError("sessionGuard requires filePath and an explicit 32-byte/64-hex encryption key");
-      }
-      guard = createSessionGuard({
-        filePath: sessionGuardOptions.filePath,
-        backupPath: sessionGuardOptions.backupPath,
-        key: sessionGuardOptions.key,
-        onRecovery: sessionGuardOptions.onRecovery,
-        getSession: () => ({
-          version: 1,
-          userId: session.userId,
-          appState: session.getAppState(),
-          savedAt: Date.now()
-        })
-      });
+    if (guard) {
       await guard.saveNow();
       guard.start(sessionGuardOptions.intervalMs === undefined ? 60_000 : sessionGuardOptions.intervalMs);
     }
