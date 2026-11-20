@@ -88,10 +88,13 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       normalized = validateSessionCookies(credentials.appState);
     } else if (mode === "cookie") {
       normalized = validateSessionCookies(parseCookieHeader(credentials.cookie));
+    } else if (mode === "session") {
+      // Restore an encrypted AppState snapshot through a first-party provider.
+      normalized = null;
     } else if (mode === "credentials") {
-      throw new TypeError("Facebook email/username and password login is deferred; use an authorized AppState or cookie");
+      throw new TypeError("Facebook email/username and password login is deferred; use an authorized AppState or encrypted session");
     } else {
-      throw new TypeError("Login mode must be appstate or cookie");
+      throw new TypeError("Login mode must be appstate, cookie, or session");
     }
 
     let lastConnectError = null;
