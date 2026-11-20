@@ -40,7 +40,7 @@ function normalizeCookies(input) {
       value: item.value,
       domain,
       path,
-      hostOnly: item.hostOnly === undefined ? !(typeof rawDomain === "string" && rawDomain.trim().startsWith(".")) : Boolean(item.hostOnly),
+      hostOnly: item.hostOnly === undefined ? false : Boolean(item.hostOnly),
       secure: Boolean(item.secure),
       httpOnly: Boolean(item.httpOnly),
       ...(typeof item.sameSite === "string" ? { sameSite: item.sameSite } : {}),
