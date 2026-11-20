@@ -26,3 +26,17 @@ test("replaces duplicate cookie tuples and clears the jar", () => {
   jar.clear();
   assert.equal(jar.size, 0);
 });
+
+test("imports Facebook domain cookies for www.facebook.com requests", () => {
+  const { parseCookieHeader, normalizeCookies } = require("../src/security/cookies");
+  const raw = parseCookieHeader("c_user=123456; xs=session-value");
+  const jar = new CookieJar(raw);
+  assert.equal(jar.getCookieHeader("https://www.facebook.com/"), "c_user=123456; xs=session-value");
+
+  const appState = normalizeCookies([
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "session-value", domain: "facebook.com" }
+  ]);
+  const appStateJar = new CookieJar(appState);
+  assert.equal(appStateJar.getCookieHeader("https://www.facebook.com/"), "c_user=123456; xs=session-value");
+});
