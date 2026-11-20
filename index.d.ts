@@ -411,7 +411,6 @@ export function createFacebookThreadApi(options: { session: PersonalSession; web
 export interface SessionGuardOptions {
   filePath: string;
   key: string | Buffer | Uint8Array;
-  intervalMs?: number;
   getSession(): Record<string, unknown> | Promise<Record<string, unknown>>;
   backupPath?: string;
   onRecovery?: (event: Readonly<{ source: "backup" | "save"; restored: boolean; errorCode?: string }>) => void;
