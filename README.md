@@ -41,7 +41,7 @@ const client = createFacebookMqttClient({
 });
 ```
 
-After MQTT setup succeeds, the driver writes an encrypted snapshot immediately and then periodically. It keeps a verified encrypted backup, exposes `api.sessionGuard()` for safe path/save access, and `api.stopSessionGuard()` for a final save. Normal logout also stops the timer and attempts a final save. Keep the key outside the repository and backups; losing the key makes the encrypted snapshots unrecoverable. Do not put it in `config.json`, `account.txt`, logs, or CI output.
+After MQTT setup succeeds, the driver writes an encrypted snapshot immediately and then periodically. It keeps a verified encrypted backup, exposes `api.sessionGuard()` for safe path/save access, and `api.stopSessionGuard()` for a final save. Normal logout also stops the timer and attempts a final save. On a later process start, call `client.login({ mode: "session" })` to restore the encrypted snapshot, revalidate it with Facebook, and reconnect MQTT without re-entering AppState. Keep the key outside the repository and backups; losing the key makes the encrypted snapshots unrecoverable. Do not put it in `config.json`, `account.txt`, logs, or CI output.
 
 ## GoatBot account configuration
 
