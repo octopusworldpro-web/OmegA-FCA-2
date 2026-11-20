@@ -46,15 +46,22 @@ async function createFacebookMqttDriver({
       });
     }
     let activeAppState = appState;
+    let restoredSnapshot = null;
     if (!Array.isArray(activeAppState) || activeAppState.length === 0) {
       if (!guard) throw new TypeError("AppState is required unless an encrypted SessionGuard is configured");
-      const restored = guard.load();
-      if (!Array.isArray(restored.appState) || restored.appState.length === 0) {
+      restoredSnapshot = guard.load();
+      if (!Array.isArray(restoredSnapshot.appState) || restoredSnapshot.appState.length === 0) {
         throw new TypeError("Encrypted SessionGuard snapshot does not contain an AppState cookie array");
       }
-      activeAppState = restored.appState;
+      activeAppState = restoredSnapshot.appState;
     }
     session = await createPersonalSession({ appState: activeAppState, fetchImpl, userAgent, timeoutMs, onDiagnostic });
+    if (restoredSnapshot?.userId != null && String(restoredSnapshot.userId) !== session.userId) {
+      const error = new Error("Restored Facebook session identity does not match the encrypted snapshot");
+      error.code = "FCA_SESSION_IDENTITY_MISMATCH";
+      error.retryable = false;
+      throw error;
+    }
     const protocolConfig = createFacebookMqttProtocol({
       ...mqtt, userId: session.userId,
       url: mqtt.url || session.realtime.endpoint || undefined,
