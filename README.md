@@ -1,12 +1,12 @@
 # OmegA Bot — OmegA-FCA
 
-**An independent FCA-compatible transport foundation by NirZon.**
+**An experimental, AppState-first personal Messenger client and FCA compatibility layer by NirZon.**
 
 OmegA-FCA is the Facebook integration library maintained under the **OmegA Bot** brand by **NirZon**.
 
-> **Status:** personal-account compatibility bridge added. This package can adapt an existing authorized personal-account FCA login implementation, but it does not implement Facebook's private login or MQTT wire protocol itself and is not a standalone FCA engine.
+ > **Status:** experimental native personal-account path. AppState session validation, MQTT/WebSocket bootstrap, a limited event normalizer, a limited action set, and GoatBot callback compatibility are implemented with synthetic tests. This is not yet a verified drop-in FCA replacement: live Facebook broker acceptance, complete event/action parity, and authorized-account end-to-end tests remain outstanding.
 
-**Package:** `@omega/fca` · **Node.js:** 20+ · **Author:** NirZon
+**Package:** `@nirzon-islam/omega-fca` · **Node.js:** 20+ · **Author:** NirZon
 
 ## Included
 
@@ -45,7 +45,7 @@ Alternatively, put a JSON cookie array in `appstate.json`. A non-empty `account.
 The first native session layer can validate an owner-supplied AppState and issue bounded HTTPS requests only to Facebook/Messenger hosts. It preserves scoped response cookies and stops with an explicit checkpoint or expired-session error; it does not bypass either state.
 
 ```js
-const { createPersonalSession } = require("@omega/fca");
+const { createPersonalSession } = require("@nirzon-islam/omega-fca");
 const session = await createPersonalSession({ appState: require("./account.json") });
 const response = await session.request("https://www.facebook.com/");
 console.log(session.userId, response.status);
@@ -56,7 +56,7 @@ This is a session foundation only: it does not yet provide the full FCA action A
 
 ## Experimental Messenger MQTT transport
 
-`createFacebookMqttProtocol()` provides the observed MQTT 3.1 broker handshake, topic subscription and initial sync queue setup. It can be supplied to `createNativeRealtimeTransport()` with a WebSocket implementation. The adapter exposes raw MQTT publish events; it does not yet convert all Messenger delta payloads into stable FCA `message` / `message_reply` / `read` events or implement all FCA send actions. See [Facebook MQTT transport notes](docs/FACEBOOK-MQTT-TRANSPORT.md).
+`createFacebookMqttClient()` provides the first-party AppState-only path: it validates the supplied session, opens the native WebSocket/MQTT transport, subscribes and initializes sync, and exposes a GoatBot-style callback listener. Known Messenger delta classes are normalized conservatively; unknown classes remain explicit. A limited set of web/thread and MQTT actions is available, but this is not full FCA parity. The private broker protocol, delta schemas, and action payloads are unofficial and have not been validated against a live Facebook account. See [Facebook MQTT transport notes](docs/FACEBOOK-MQTT-TRANSPORT.md) and [implementation status](docs/IMPLEMENTATION-STATUS.md).
 
 ## Realtime frame inspection
 
@@ -73,7 +73,7 @@ A secret-safe diagnostic recorder is available for the current AppState-backed s
 The adapter is a temporary migration/test utility for AppState-backed sessions. It lets an existing FCA implementation plug into OmegA-FCA without pretending that the Facebook protocol has been reimplemented:
 
 ```js
-const { createClient, createLegacyFcaProvider } = require("@omega/fca");
+const { createClient, createLegacyFcaProvider } = require("@nirzon-islam/omega-fca");
 // Supply a caller-owned FCA implementation only when testing the migration adapter.
 const legacyFcaLogin = require("your-existing-fca");
 
@@ -95,16 +95,16 @@ api.listenMqtt((error, event) => {
 
 Use only an account and session you own or are authorized to operate. Keep `account.json`, passwords, 2FA secrets, and session keys outside source control. If Facebook presents a checkpoint, resolve it through Facebook as the account owner and then retry with a fresh authorized session.
 
-This legacy adapter is not the OmegA-FCA engine and is not used by the native session foundation. It exists only as an optional migration/test shim. The target runtime is being implemented inside OmegA-FCA itself.
+This adapter is optional and is not required by the first-party `createFacebookMqttClient()` path.
 
-## What is still required for a standalone replacement
+## Remaining standalone-replacement gates
 
-- Native username/password authentication (including owner-controlled 2FA and checkpoint handoff), plus full session lifecycle.
-- Independently implemented Facebook realtime transport and event decoding.
-- Complete legacy FCA behavior parity and real authorized-account end-to-end tests.
-- GoatBot integration test on the target bot branch.
+- Native username/password authentication and owner-controlled 2FA/checkpoint continuation are deferred; AppState/cookie is the only native login path in this phase.
+- Full Messenger event normalization, attachment handling, and the complete legacy FCA action catalog are not implemented.
+- Facebook MQTT broker acceptance, event delivery, message send, reconnect recovery, and group operations still need authorized live-account verification.
+- Complete legacy FCA behavior parity and GoatBot integration tests must pass before production migration.
 
-Do not replace GoatBot's current FCA dependency with this package as a standalone transport until those gates pass. The Page transport is separate and does not satisfy personal profile or group-chat requirements.
+Do not treat this experimental release as a drop-in production replacement until those gates pass. The official Meta Page transport is separate and does not satisfy personal-profile or group-chat requirements.
 
 ## Security
 
