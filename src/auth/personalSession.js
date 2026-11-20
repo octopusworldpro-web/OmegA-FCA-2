@@ -61,26 +61,55 @@ function extractFacebookTokens(html) {
 }
 
 function extractRealtimeConfig(html) {
-  // Facebook embeds account-specific Messenger broker metadata in the
-  // authenticated home page. Treat it as untrusted input and validate it.
-  const patterns = [
-    /irisSeqID:"([^"]+)",appID:219994525426954,endpoint:"([^"]+)"/,
-    /"app_id":"219994525426954","endpoint":"([^"]+)","iris_seq_id":"([^"]+)"/,
-    /\["MqttWebConfig",\[\],\{fbid:"[0-9]+",appID:219994525426954,endpoint:"([^"]+)"/
-  ];
-  for (let i = 0; i < patterns.length; i++) {
-    const match = patterns[i].exec(html);
-    if (!match) continue;
-    const endpoint = (i === 1 ? match[1] : match[2] || match[1]).replace(/\\\//g, "/");
+  // Search both known inline shapes and the bounded MqttWebConfig object.
+  // Facebook markup is mutable; field order is not treated as significant.
+  if (typeof html !== "string" || html.length > MAX_RESPONSE_BYTES) {
+    return Object.freeze({ endpoint: null, region: null, lastSeqId: null });
+  }
+  const scopes = [html];
+  const configPattern = /MqttWebConfig[^{}]{0,256}\{([^{}]{0,4096})\}/g;
+  let configMatch;
+  while ((configMatch = configPattern.exec(html)) !== null) scopes.push(configMatch[1]);
+
+  const read = (scope, patterns) => {
+    for (const pattern of patterns) {
+      const match = pattern.exec(scope);
+      if (match && match[1]) return match[1].replace(/\\\//g, "/");
+    }
+    return null;
+  };
+  for (const scope of scopes) {
+    const appId = read(scope, [
+      /(?:appID|app_id)\s*:\s*"?(\d+)"?/,
+      /["'](?:appID|app_id)["']\s*:\s*["'](\d+)["']/
+    ]);
+    if (appId && appId !== "219994525426954") continue;
+
+    const endpoint = read(scope, [
+      /(?:endpoint|mqttEndpoint)\s*:\s*"([^"]+)"/,
+      /["'](?:endpoint|mqttEndpoint)["']\s*:\s*"([^"]+)"/
+    ]);
+    if (!endpoint) continue;
     let url;
     try { url = new URL(endpoint); } catch { continue; }
-    if (url.protocol !== "wss:" || url.hostname !== "edge-chat.facebook.com" || url.pathname !== "/chat") continue;
-    const sequence = i === 1 ? match[2] : (i === 2 ? null : match[1]);
-    return Object.freeze({ endpoint: url.toString(), region: url.searchParams.get("region"), lastSeqId: sequence });
+    if (url.protocol !== "wss:" || url.hostname !== "edge-chat.facebook.com" ||
+        url.pathname !== "/chat" || url.username || url.password ||
+        (url.port && url.port !== "443")) continue;
+
+    const sequence = read(scope, [
+      /(?:irisSeqID|iris_seq_id|lastSeqId|last_seq_id)\s*:\s*"?([0-9]{1,30})"?/,
+      /["'](?:irisSeqID|iris_seq_id|lastSeqId|last_seq_id)["']\s*:\s*["']([0-9]{1,30})["']/
+    ]);
+    const region = url.searchParams.get("region");
+    if (region && !/^[a-z]{2,8}$/i.test(region)) continue;
+    return Object.freeze({
+      endpoint: url.toString(),
+      region: region ? region.toLowerCase() : null,
+      lastSeqId: sequence
+    });
   }
   return Object.freeze({ endpoint: null, region: null, lastSeqId: null });
 }
-
 function collectResponseCookies(response, requestUrl) {
   const raw = typeof response.headers?.getSetCookie === "function"
     ? response.headers.getSetCookie()
