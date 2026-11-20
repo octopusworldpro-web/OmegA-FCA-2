@@ -86,3 +86,80 @@ test("rejects invalid IDs, endpoints, topic lists and cookie injection", () => {
   assert.throws(() => createFacebookMqttProtocol({ userId: "123456789", cookie: "a=b\r\nInjected: yes" }), /invalid characters/);
   assert.throws(() => createFacebookMqttProtocol({ userId: "123456789", topics: ["bad"] }), /topic filters/);
 });
+
+
+test("uses the negotiated MQTT keepalive for its PINGREQ interval", async () => {
+  const originalSetInterval = global.setInterval;
+  const originalClearInterval = global.clearInterval;
+  const scheduled = [];
+  global.setInterval = (callback, delay) => {
+    scheduled.push({ callback, delay });
+    return { unref() {} };
+  };
+  global.clearInterval = () => {};
+  try {
+    const config = createFacebookMqttProtocol({ userId: "123456789" });
+    const sent = [];
+    const closeHandlers = [];
+    const socket = {
+      readyState: 1,
+      send: frame => sent.push(Buffer.from(frame)),
+      once: (event, callback) => { if (event === "close") closeHandlers.push(callback); }
+    };
+    await config.protocol.authenticate(socket, {
+      waitForFrame: async () => Buffer.from([0x20, 0x02, 0x00, 0x00])
+    });
+    const connect = mqtt.decodeRemainingLength(sent[0]);
+    assert.equal(sent[0].readUInt16BE(connect.offset + 10), 10);
+
+    await config.protocol.subscribe(socket, {
+      waitForFrame: async () => {
+        const subscribe = sent[sent.length - 1];
+        const remaining = mqtt.decodeRemainingLength(subscribe);
+        const id = subscribe.readUInt16BE(remaining.offset);
+        return Buffer.from([0x90, 0x03, id >> 8, id & 0xff, 0x01]);
+      }
+    });
+
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].delay, 5000);
+    assert.equal(closeHandlers.length, 1);
+    closeHandlers[0]();
+  } finally {
+    global.setInterval = originalSetInterval;
+    global.clearInterval = originalClearInterval;
+  }
+});
+
+test("honors an explicit MQTT keepalive for both CONNECT and PINGREQ timing", async () => {
+  const originalSetInterval = global.setInterval;
+  const originalClearInterval = global.clearInterval;
+  const delays = [];
+  global.setInterval = (callback, delay) => {
+    delays.push(delay);
+    return { unref() {} };
+  };
+  global.clearInterval = () => {};
+  try {
+    const config = createFacebookMqttProtocol({ userId: "123456789", keepAlive: 20 });
+    const sent = [];
+    const socket = { readyState: 1, send: frame => sent.push(Buffer.from(frame)), once() {} };
+    await config.protocol.authenticate(socket, {
+      waitForFrame: async () => Buffer.from([0x20, 0x02, 0x00, 0x00])
+    });
+    const connect = mqtt.decodeRemainingLength(sent[0]);
+    assert.equal(sent[0].readUInt16BE(connect.offset + 10), 20);
+    await config.protocol.subscribe(socket, {
+      waitForFrame: async () => {
+        const subscribe = sent[sent.length - 1];
+        const remaining = mqtt.decodeRemainingLength(subscribe);
+        const id = subscribe.readUInt16BE(remaining.offset);
+        return Buffer.from([0x90, 0x03, id >> 8, id & 0xff, 0x01]);
+      }
+    });
+    assert.deepEqual(delays, [10000]);
+  } finally {
+    global.setInterval = originalSetInterval;
+    global.clearInterval = originalClearInterval;
+  }
+});
