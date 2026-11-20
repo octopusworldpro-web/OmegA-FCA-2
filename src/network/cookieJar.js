@@ -53,7 +53,7 @@ class CookieJar {
     const matches = this.cookies.filter(cookie => {
       if (cookie.expires) {
         const expiry = cookie.expires instanceof Date ? cookie.expires.getTime()
-          : typeof cookie.expires === "number" ? cookie.expires * 1000
+          : typeof cookie.expires === "number" ? (cookie.expires > 1e12 ? cookie.expires : cookie.expires * 1000)
           : Date.parse(cookie.expires);
         if (Number.isFinite(expiry) && expiry > 0 && expiry <= now) return false;
       }
