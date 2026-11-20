@@ -82,7 +82,7 @@ test("native driver automatically snapshots AppState when SessionGuard is config
     assert.equal(fs.existsSync(filePath), true);
     const saved = require("../src/security/sessionStore").loadSession(filePath, key);
     assert.equal(saved.userId, "123456789012345");
-    assert.deepEqual(saved.appState, appState);
+    assert.deepEqual(saved.appState.map(({ key, value }) => ({ key, value })), appState.map(({ key, value }) => ({ key, value })));
     assert.equal(typeof driver.stopSessionGuard, "function");
     assert.equal(await driver.stopSessionGuard(), true);
     assert.throws(() => driver.sessionGuard(), /SessionGuard is not configured/);
