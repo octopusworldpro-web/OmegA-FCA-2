@@ -15,7 +15,8 @@ test("builds the observed Messenger MQTT broker URL and browser headers", () => 
   assert.equal(url.origin + url.pathname, DEFAULT_MQTT_URL);
   assert.equal(url.searchParams.get("region"), "fra");
   assert.equal(url.searchParams.get("sid"), String(config.session.sessionId));
-  assert.equal(url.searchParams.get("cid"), config.session.deviceId);
+  assert.equal(url.searchParams.has("cid"), false);
+  assert.equal(config.session.clientId, "mqttwsclient");
   assert.equal(config.headers.Origin, "https://www.facebook.com");
   assert.equal(config.headers.Cookie, "c_user=123456789; xs=private");
   assert.equal(DEFAULT_MQTT_TOPICS.includes("/t_ms"), true);
@@ -54,7 +55,11 @@ test("subscribes to observed topics and initializes the Messenger sync queue", a
   const queue = mqtt.decodePacket(sent[1]);
   assert.equal(queue.type, "publish");
   assert.equal(queue.topic, "/messenger_sync_create_queue");
-  assert.equal(JSON.parse(queue.payload.toString()).entity_fbid, "123456789");
+  const queuePayload = JSON.parse(queue.payload.toString());
+  assert.equal(queuePayload.entity_fbid, "123456789");
+  assert.equal(queuePayload.sync_api_version, 10);
+  assert.equal(queuePayload.max_deltas_able_to_process, 1000);
+  assert.equal(queuePayload.delta_batch_size, 500);
   assert.equal(mqtt.decodePacket(sent[2]).topic, "/foreground_state");
   assert.deepEqual(JSON.parse(mqtt.decodePacket(sent[2]).payload.toString()), { foreground: true });
   assert.equal(mqtt.decodePacket(sent[3]).topic, "/set_client_settings");
