@@ -23,6 +23,9 @@ async function createFacebookMqttDriver({
   try {
     const protocolConfig = createFacebookMqttProtocol({
       ...mqtt, userId: session.userId,
+      url: mqtt.url || session.realtime.endpoint || undefined,
+      region: mqtt.region || session.realtime.region || undefined,
+      lastSeqId: mqtt.lastSeqId || session.realtime.lastSeqId || undefined,
       cookie: session.getCookieHeader("https://edge-chat.facebook.com/chat"),
       userAgent, syncCursorStore, onSyncCursor, requestTimeoutMs, maxPendingRequests
     });
