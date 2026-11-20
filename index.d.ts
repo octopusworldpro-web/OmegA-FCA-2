@@ -1,4 +1,4 @@
-export type LoginMode = "appstate" | "cookie";
+export type LoginMode = "appstate" | "cookie" | "session";
 export type AuthenticationAttemptState = "idle" | "authenticating" | "challenge_required" | "verifying_challenge" | "authenticated" | "failed" | "closed";
 export interface AuthenticationChallenge { readonly type: string; readonly message: string | null; readonly methods: readonly string[]; }
 export interface AuthenticationAttemptSnapshot { readonly state: AuthenticationAttemptState; readonly challenge: AuthenticationChallenge | null; readonly challengeRounds: number; readonly authenticated: boolean; readonly error: Readonly<{ name: string; code: string | null; message: string }> | null; }
@@ -85,7 +85,7 @@ export interface TransportDriver {
   setOptions?(options: Record<string, unknown>): unknown;
 }
 export interface ClientOptions {
-  authenticate(context: { mode: LoginMode; credentials: Cookie[];
+  authenticate(context: { mode: LoginMode; credentials: Cookie[] | null;
     options: Record<string, unknown>; context: ConnectionContext; license: VerifiedLicense | null;
   }): Promise<TransportDriver> | TransportDriver;
   options?: Record<string, unknown>;
@@ -378,7 +378,7 @@ export interface MessengerSyncCursorStore { load(): MessengerSyncCursor | null; 
 export function createMessengerSyncCursorStore(options: { filePath: string; key: string | Buffer | Uint8Array; userId: string | number }): MessengerSyncCursorStore;
 
 export interface NativeDriverSessionGuardOptions extends Omit<SessionGuardOptions, "getSession"> { intervalMs?: number; }
-export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState: Cookie[]; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; sessionGuard?: NativeDriverSessionGuardOptions; }
+export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState?: Cookie[]; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; sessionGuard?: NativeDriverSessionGuardOptions; }
 export function createFacebookMqttDriver(options: FacebookMqttDriverOptions): Promise<TransportDriver & { getCurrentUserID(): string; getSessionState(): "active"; sendRequest(payload: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<unknown>; sendMessage(input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; disconnect(): Promise<void>; sessionGuard(): Readonly<{ filePath: string; backupPath: string; saveNow(): Promise<string> }> | null; stopSessionGuard(): Promise<boolean>; }>;
 export interface MessengerSyncCursor { syncToken: string | null; lastSeqId: string | number | null; }
 
