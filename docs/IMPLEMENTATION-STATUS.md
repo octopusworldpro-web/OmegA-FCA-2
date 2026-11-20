@@ -4,6 +4,7 @@
 
 - Node.js 20+ CommonJS package, root exports and TypeScript declarations.
 - Cookie/AppState parsing and validation, encrypted session helpers, restrictive file permissions and secret redaction.
+- **New encrypted SessionGuard utility:** explicit caller-provided encryption key, atomic encrypted snapshots, verified previous-snapshot backup, periodic save hook, and automatic restore from a valid encrypted backup if the primary snapshot is corrupted. It never generates or stores encryption keys and does not silently overwrite a corrupt backup.
 - **Updated:** account configuration is AppState-only for this phase. `account.txt` accepts cookie/AppState data only and rejects credential-like key/value text. The loader does not read email, username, password, 2FA, or `FB_*` environment credentials; credential login is deferred.
 - **New AppState test entry point:** `npm run test:appstate` validates an owner-supplied AppState from `account.txt` (or the documented `appstate.json` fallback), reports only non-secret session metadata, and is deliberately excluded from CI because it requires a real authorized session and network access.
 - **New native personal-session foundation:** `createPersonalSession()` validates an owner-supplied AppState against Facebook over HTTPS, scopes session cookies to Facebook/Messenger hosts, provides bounded-time authenticated web requests, and reports expired sessions/checkpoints without bypassing them.
