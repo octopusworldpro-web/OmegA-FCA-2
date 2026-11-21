@@ -136,3 +136,15 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - Added regression tests for aborting reconnect backoff, waiting for recovery disposal, invalid retry policies, PINGRESP handling, missing-response socket closure, and keepalive bounds.
 - GitHub Actions run #306 (`44877756730`) passed on Node.js 20 and 22: 376 tests passed, 0 failed on each runtime; syntax checks, package root export smoke test, and publishable package verification also passed.
 - This is synthetic transport/CI verification. No authorized live Facebook account or production broker acceptance test has been run; live reconnect and event delivery remain an owner-operated acceptance gate.
+
+
+## Serial workflow checkpoint — Step 5 complete (2026-11-21)
+
+- Text, sticker, reply and attachment sends retain their separate native paths. MQTT text/reply sends await the correlated `/ls_resp`; explicit Facebook rejection payloads now raise `FCA_FACEBOOK_REQUEST_REJECTED` instead of being returned as apparent success.
+- `shareContact` now uses the same bounded request/response correlation rather than fire-and-forget publishing, and returns the broker response payload instead of fabricating `{ success: true }` after a socket write.
+- `editMessage` remains request-correlated, validates the returned message ID/body, and rejects old or non-owned messages with `FCA_MESSAGE_EDIT_REJECTED`. `unsendMessage` uses the authenticated unsend endpoint with explicit rejection handling.
+- Read, read-all, seen and delivery receipts have focused request-shape, validation and callback tests. Read-receipt event normalization now preserves `watermarkTimestamp` from message metadata as well as top-level delta fields.
+- Hardened concurrent MQTT request tracking: a failed publish rejects only its own request, saturated/invalid requests are rejected before any packet is published, and request-ID wraparound skips IDs that are still pending.
+- Added regression coverage for reply metadata/correlation, send rejection, edit rejection, share-contact response correlation, unsend/read/seen/delivery receipts, read watermark metadata, concurrent request isolation and request-ID wraparound. Updated public TypeScript signatures for edit, unsend and receipt methods.
+- GitHub Actions run #325 (`44878685676`) passed on Node.js 20 and 22: 384 tests passed, 0 failed on each runtime; syntax checks, package root export smoke test, and publishable package verification passed.
+- This is synthetic CI verification only. No authorized live Facebook account, recipient-confirmed message delivery, edit/unsend acceptance, or production receipt acceptance has been run; those remain owner-operated live acceptance checks.
