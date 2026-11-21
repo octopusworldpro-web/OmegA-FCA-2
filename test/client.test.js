@@ -320,3 +320,26 @@ test("client exposes legacy media, link and location send helpers", async () => 
   await client.logout();
 });
 
+test("FCA API exposes logout with Promise and callback forms", async () => {
+  let disconnected = 0;
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      listen: () => () => {},
+      disconnect: async () => { disconnected++; }
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  assert.equal(typeof api.logout, "function");
+  await new Promise((resolve, reject) => {
+    const returned = api.logout(error => error ? reject(error) : resolve());
+    assert.equal(returned, undefined);
+  });
+  assert.equal(disconnected, 1);
+  assert.equal(client.getConnectionState().state, "idle");
+});
+
