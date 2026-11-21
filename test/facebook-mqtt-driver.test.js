@@ -353,7 +353,8 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
     if (url.hostname === "upload.facebook.com" && url.pathname.endsWith("/upload.php")) {
       const fields = Array.from(init.body.entries()).map(([name]) => name);
       seen.push({ kind: "upload", fields });
-      return jsonResponse({ payload: { metadata: [{ image_id: "987654321", filetype: "image/png" }] } });
+      const uploaded = fields.filter(name => name.startsWith("upload_")).map((_, index) => index === 0 ? { image_id: "987654321", filetype: "image/png" } : { file_id: "876543210", filetype: "application/pdf" });
+      return jsonResponse({ payload: { metadata: uploaded } });
     }
     if (url.hostname === "www.facebook.com" && url.pathname === "/messaging/send/") {
       const form = new URLSearchParams(init.body);
@@ -378,7 +379,9 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
       replyToMessageID: "mid-reply"
     });
     assert.equal(sent.messageID, "mid-attachment");
-    assert.equal(sent.attachments[0].attachmentID, "987654321");\n    assert.equal(sent.attachments[1].attachmentID, "876543210");\n    assert.equal(sent.attachments[1].type, "file");
+    assert.equal(sent.attachments[0].attachmentID, "987654321");
+    assert.equal(sent.attachments[1].attachmentID, "876543210");
+    assert.equal(sent.attachments[1].type, "file");
     assert.deepEqual(seen.find(item => item.kind === "upload").fields.slice(0, 4), ["voice_clip", "upload_0", "upload_1", "av"]);
     assert.deepEqual(seen.find(item => item.kind === "send"), {
       kind: "send", imageID: "987654321", fileID: "876543210", body: "photo caption", reply: "mid-reply"
