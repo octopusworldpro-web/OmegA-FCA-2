@@ -177,6 +177,19 @@ async function createFacebookMqttDriver({
       error.code = "FCA_E2EE_STORAGE_KEY_REQUIRED";
       throw error;
     }
+    if (e2eeDevicePath) {
+      const protectedPaths = [
+        path.resolve(process.cwd(), "account.txt"),
+        path.resolve(process.cwd(), "appstate.json"),
+        sessionGuardOptions?.filePath ? path.resolve(sessionGuardOptions.filePath) : null,
+        sessionGuardOptions?.backupPath ? path.resolve(sessionGuardOptions.backupPath) : null
+      ].filter(Boolean);
+      if (protectedPaths.includes(path.resolve(e2eeDevicePath))) {
+        const error = new Error("E2EE device storage must not overwrite account.txt, appstate.json, or SessionGuard files");
+        error.code = "FCA_E2EE_STORAGE_PATH_CONFLICT";
+        throw error;
+      }
+    }
     function dispatchE2EEEvent(error, event) {
       if (event && typeof event === "object") {
         event.isE2EE = true;
