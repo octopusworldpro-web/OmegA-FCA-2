@@ -11,6 +11,7 @@ const { DeviceStore } = require("../src/e2ee/store");
 const { createE2EEHttpAdapter } = require("../src/e2ee/httpAdapter");
 const { E2EEClient } = require("../src/e2ee/client");
 const proto = require("../src/e2ee/proto");
+const binary = require("../src/e2ee/binary");
 
 test("E2EE X25519 key agreement and XEdDSA signed-prekey verification", () => {
   const alice = crypto.generateKeyPair();
@@ -142,8 +143,10 @@ test("E2EE typing sends composing and paused chatstate frames", async () => {
   await invoke(true);
   await invoke(false);
   assert.equal(frames.length, 2);
-  assert.equal(frames[0].tag, "chatstate");
-  assert.equal(frames[0].attrs.type, "composing");
-  assert.equal(frames[0].attrs.to, "123456789.0@msgr");
-  assert.equal(frames[1].attrs.type, "paused");
+  const composing = binary.unmarshal(binary.marshal(frames[0]));
+  const paused = binary.unmarshal(binary.marshal(frames[1]));
+  assert.equal(composing.tag, "chatstate");
+  assert.equal(composing.attrs.type, "composing");
+  assert.equal(composing.attrs.to, "123456789.0@msgr");
+  assert.equal(paused.attrs.type, "paused");
 });
