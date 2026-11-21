@@ -182,3 +182,17 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - [ ] Authorized live Facebook acceptance remains a separate release gate and is not implied by declaration coverage.
 
 **Status:** Public TypeScript declaration/export coverage and package documentation are updated. CI verification is required before Step 9 is marked verified complete.
+
+## Step 10 — GoatBot prerelease compatibility and packaging checkpoint (2026-11-21)
+
+- [x] Verified the GoatBot fca-migration-cleanup call-site baseline against FCA main and corrected stale matrix entries for bounded thread-list/history pagination and third-position reply IDs.
+- [x] Confirmed source-level read-receipt aliases (reader/userID), nested messageReply normalization, and bounded attachment upload/send paths are present in the current FCA candidate.
+- [x] Added a stream-backed attachment send regression using a Node Readable stream, alongside existing Buffer upload/send, metadata validation, pagination, reply and receipt tests.
+- [x] Set the package candidate to 0.1.6-rc.3 in package.json and package-lock.json; configured npm prereleases to publish on the next dist-tag so the stable latest tag is not moved.
+- [x] Added docs/PRERELEASE-PUBLISHING.md with pre-publish checks, package-content review, owner-operated publish command and post-publish verification. CI does not publish and no npm credentials are stored in the repository.
+- [ ] Latest CI for the final packaging commit must pass on Node 20 and 22, including tests, type/export checks, syntax checks and npm pack --dry-run.
+- [ ] Owner must publish the candidate with npm publish --access public --tag next and verify npm view @nirzon-islam/omega-fca@next version before GoatBot's dependency and lockfile can be updated.
+- [ ] GoatBot fca-migration-cleanup remains pinned to the last published dependency until the candidate is actually available from npm; no guessed package version is installed.
+- [ ] Authorized live Facebook/AppState acceptance (login, stable MQTT, inbound events, text/reply and stream attachment sends, and group actions) remains an owner-operated release gate. Synthetic CI is not live acceptance.
+
+**Status:** Source-level integration and prerelease packaging are prepared. This checkpoint is not a claim that the package has been published, GoatBot has consumed the new artifact, or Facebook live acceptance has passed.
