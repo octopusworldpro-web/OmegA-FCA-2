@@ -10,8 +10,13 @@ function createMqttRequestTracker(options = {}) {
   const pending = new Map();
 
   function allocateId() {
-    nextId = nextId >= Number.MAX_SAFE_INTEGER ? 1 : nextId + 1;
-    return nextId;
+    // IDs can wrap during long-lived sessions. Never hand out an ID that is
+    // still awaiting a response from an earlier request.
+    for (let checked = 0; checked <= maxPending; checked++) {
+      nextId = nextId >= Number.MAX_SAFE_INTEGER ? 1 : nextId + 1;
+      if (!pending.has(String(nextId))) return nextId;
+    }
+    throw Object.assign(new Error("MQTT pending request limit reached"), { code: "FCA_MQTT_PENDING_LIMIT" });
   }
 
   function track(requestId, customTimeoutMs = timeoutMs) {
@@ -46,13 +51,22 @@ function createMqttRequestTracker(options = {}) {
     return true;
   }
 
+  function reject(requestId, reason) {
+    const id = String(requestId);
+    const entry = pending.get(id);
+    if (!entry) return false;
+    const error = reason instanceof Error ? reason : new Error(String(reason || "MQTT request rejected"));
+    entry.reject(error);
+    return true;
+  }
+
   function rejectAll(reason) {
     const error = reason instanceof Error ? reason : new Error(String(reason || "MQTT connection closed"));
     for (const entry of [...pending.values()]) entry.reject(error);
   }
 
   return Object.freeze({
-    allocateId, track, resolve, rejectAll,
+    allocateId, track, resolve, reject, rejectAll,
     get pendingCount() { return pending.size; }
   });
 }
