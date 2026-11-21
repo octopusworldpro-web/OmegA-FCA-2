@@ -434,7 +434,7 @@ E2EEClient.prototype.recordFrame = function(frame) {
 E2EEClient.prototype.isKnownE2EEThread = function(threadId) {
   if (!this.store) {
     try {
-      this.store = DeviceStore.fromFile(this.ctx.globalOptions.e2eeDevicePath);
+      this.store = DeviceStore.fromFile(this.ctx.globalOptions.e2eeDevicePath, this.ctx.globalOptions.e2eeStorageKey);
     } catch (e) {
       return false;
     }
