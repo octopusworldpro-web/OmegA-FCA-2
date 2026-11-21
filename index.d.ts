@@ -108,7 +108,7 @@ export interface ClientApi {
   stopListening(callback?: () => void): boolean;
   changeAvatar?: (image: Uint8Array | Blob | AsyncIterable<Uint8Array>, caption?: string | number | ((error: Error | null, result?: Record<string, unknown>) => void), timestamp?: number | ((error: Error | null, result?: Record<string, unknown>) => void), callback?: (error: Error | null, result?: Record<string, unknown>) => void) => Promise<Record<string, unknown>> | void;
   changeGroupImage?: (image: Uint8Array | Blob | AsyncIterable<Uint8Array>, threadID: string | number, callback?: (error: Error | null, result?: Record<string, unknown>) => void) => Promise<Record<string, unknown>> | void;
-  sendRequest?: (payload: Record<string, unknown>, options?: { timeoutMs?: number }) => Promise<unknown>; sendMessage?: { (input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; (message: string | { body?: string; sticker?: string | number }, threadID: string | number, callback: (error: Error | null, result?: unknown) => void, replyToMessageID?: string | number): void; }; getUserInfo?: (...args: any[]) => any;
+  sendRequest?: (payload: Record<string, unknown>, options?: { timeoutMs?: number }) => Promise<unknown>; sendMessage?: { (input: { threadID: string | number; message: string | { body?: string; sticker?: string | number; attachment?: AttachmentInput | AttachmentInput[]; url?: string; mentions?: Array<{ tag: string; id?: string | number; fromIndex?: number }> }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; (message: string | { body?: string; sticker?: string | number }, threadID: string | number, callback: (error: Error | null, result?: unknown) => void, replyToMessageID?: string | number): void; }; getUserInfo?: (...args: any[]) => any;
   getThreadInfo?: (...args: any[]) => any; getThreadList?: (...args: any[]) => any;
   markAsRead?: (...args: any[]) => any; setMessageReaction?: (...args: any[]) => any;
   sendTypingIndicator?: (...args: any[]) => any; unsendMessage?: (...args: any[]) => any;
@@ -372,6 +372,22 @@ export function parseMessengerSyncPayload(input: unknown): MessengerSyncParseRes
 export function normalizeMessengerDelta(delta: unknown): Record<string, unknown> | null;
 /** Normalizes a Messenger attachment into legacy FCA type/url/id fields. */
 export function normalizeMessengerAttachment(attachment: unknown): Record<string, unknown> | null;
+
+export type AttachmentInput = Buffer | Uint8Array | Blob | AsyncIterable<Uint8Array>;
+export interface UploadedAttachment {
+  attachmentID: string; id: string; idKey: "image_id" | "video_id" | "audio_id" | "file_id" | "gif_id";
+  type: "image" | "video" | "audio" | "file" | "gif"; fileName: string; mimeType: string; size: number;
+  attachmentUrl: string | null; metadata: Record<string, unknown>;
+}
+export interface DownloadedAttachment {
+  buffer: Buffer; size: number; mimeType: string; fileName: string | null; url: string;
+}
+export function readAttachmentInput(input: AttachmentInput, options?: { maxBytes?: number }): Promise<Readonly<{ buffer: Buffer; mimeType: string; fileName: string; size: number; kind: "image" | "video" | "audio" | "file" }>>;
+export function downloadAttachment(url: string, options?: { fetchImpl?: (input: string | URL, init?: RequestInit) => Promise<Response>; maxBytes?: number; timeoutMs?: number }): Promise<DownloadedAttachment>;
+export function safeDownloadUrl(url: string): URL;
+export const MAX_ATTACHMENT_UPLOAD_BYTES: number;
+export const MAX_ATTACHMENT_DOWNLOAD_BYTES: number;
+export const MAX_ATTACHMENT_COUNT: number;
 
 export interface MqttRequestTracker { allocateId(): number; track(requestId: string | number, timeoutMs?: number): Promise<unknown>; resolve(response: unknown): boolean; rejectAll(reason?: unknown): void; readonly pendingCount: number; }
 export function createMqttRequestTracker(options?: { timeoutMs?: number; maxPending?: number; initialRequestId?: number }): MqttRequestTracker;
