@@ -19,7 +19,7 @@ No AGPL Signal library or AGPL E2EE toolkit is included.
 **Not implemented / not claimed:** group Sender Keys/SKDM, E2EE group media, Labyrinth encrypted history backup/restore, E2EE calls, and key-transparency verification. The implementation must not be described as complete Messenger E2EE for group chats or backups.
 
 Meta documents Messenger's one-to-one client-fanout Signal sessions, group Sender Keys,
-encrypted media and Noise transport in its [Messenger E2EE overview](https://engineering.fb.com/wp-content/uploads/2023/12/MessengerEnd-to-endEncryptionOverview_12-6-2023.pdf).
+encrypted media and Noise transport in its [Messenger E2EE overview](https://engineering.fb.com/wp-content/uploads/2023/12/MessengerEnd-to-EndEncryptionOverview_12-6-2023.pdf).
 This port covers the one-to-one text/media path only.
 
 ## Usage
