@@ -51,7 +51,8 @@ function createFcaClient(api) {
   const posts = group(api, [
     ["setPostReaction", "react"], ["reactToPost"], ["reactToComment"],
     ["postComment", "comment"], ["sharePost", "share"]
-  ]);\n  const account = group(api, [
+  ]);
+  const account = group(api, [
     ["getCurrentUserID", "getCurrentUserId"], ["getAppState"],
     ["getCookies"], ["refreshFb_dtsg", "refreshDtsg"],
     ["setOptions"], ["logout"], ["saveSession"], ["restoreSessionBackup"],
