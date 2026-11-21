@@ -1,8 +1,8 @@
 "use strict";
 
 const MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
-const TRUSTED_HOST = /(^|\\.)(facebook\\.com|messenger\\.com|fbcdn\\.net|fbsbx\\.com)$/i;
-const SESSION_HOST = /(^|\\.)(facebook\\.com|messenger\\.com)$/i;
+const TRUSTED_HOST = /(^|\.)(facebook\.com|messenger\.com|fbcdn\.net|fbsbx\.com)$/i;
+const SESSION_HOST = /(^|\.)(facebook\.com|messenger\.com)$/i;
 
 function validateUrl(value) {
   const url = value instanceof URL ? new URL(value.href) : new URL(value);
