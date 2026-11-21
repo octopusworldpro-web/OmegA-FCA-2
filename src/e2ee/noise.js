@@ -4,7 +4,7 @@
 
 var events = require("events");
 var util = require("util");
-var websocket = require("../websocket");
+var websocket = require("./websocket");
 var cryptoUtils = require("./crypto");
 var binary = require("./binary");
 
