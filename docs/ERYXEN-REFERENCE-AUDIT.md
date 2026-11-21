@@ -191,3 +191,10 @@ These additions are source-level implementations and deterministic tests; Facebo
 
 - `httpPostFormData(url, formData, callback?)` is now exposed through the native authenticated Facebook/Messenger web client. It retains the existing HTTPS host allowlist, request bounds, session cookie scope, and response normalization.
 - `addExternalModule(module)` now supports validated, non-conflicting custom methods on the frozen FCA facade. Extension functions are bound to the FCA API and cannot replace built-in methods.
+
+
+### User profile helper compatibility update
+
+- `getProfileInfo(userID, callback?)` and `getPublicData(userID, callback?)` now expose the normalized native `getUserInfo` result.
+- `getAvatarUser(userID, callback?)` returns the normalized profile thumbnail URL (or `null` when unavailable).
+- These are compatibility adapters over the authenticated user-info response; they do not claim extra profile fields beyond those returned by Facebook.

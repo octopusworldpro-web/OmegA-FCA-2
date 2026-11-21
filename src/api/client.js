@@ -341,6 +341,21 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       facade.createGroup = (groupTitle, participantIDs, callback) =>
         facade.createNewGroup(participantIDs, groupTitle, callback);
     }
+    if (typeof facade.getUserInfo === "function") {
+      facade.getProfileInfo = (userID, callback) => facade.getUserInfo(userID, callback);
+      facade.getPublicData = (userID, callback) => facade.getUserInfo(userID, callback);
+      facade.getAvatarUser = (userID, callback) => {
+        const operation = Promise.resolve().then(() => facade.getUserInfo(userID)).then(profiles => {
+          const profile = profiles && (profiles[String(userID)] || Object.values(profiles)[0]);
+          return profile?.thumbSrc ?? null;
+        });
+        if (typeof callback === "function") {
+          operation.then(value => callback(null, value), error => callback(error));
+          return undefined;
+        }
+        return operation;
+      };
+    }
     if (typeof driver.getE2EEStatus === "function") {
       facade.e2ee = Object.freeze({
         connect: typeof facade.connectE2EE === "function" ? facade.connectE2EE : undefined,

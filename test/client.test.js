@@ -401,3 +401,28 @@ test("addExternalModule safely registers non-conflicting bound API extensions", 
   await client.logout();
 });
 
+test("FCA facade exposes profile, public-data and avatar compatibility helpers", async () => {
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      getUserInfo: async ids => Object.fromEntries((Array.isArray(ids) ? ids : [ids]).map(id => [
+        String(id), { name: "Example User", thumbSrc: "https://scontent.xx.fbcdn.net/avatar.jpg" }
+      ])),
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  assert.equal((await api.getProfileInfo("987654321"))["987654321"].name, "Example User");
+  assert.equal((await api.getPublicData("987654321"))["987654321"].name, "Example User");
+  assert.equal(await api.getAvatarUser("987654321"), "https://scontent.xx.fbcdn.net/avatar.jpg");
+  await new Promise((resolve, reject) => {
+    api.getAvatarUser("987654321", (error, value) => error ? reject(error) : resolve(value));
+  });
+  await client.logout();
+});
+
