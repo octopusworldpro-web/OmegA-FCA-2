@@ -32,6 +32,11 @@ function createFacebookMqttClient(options = {}) {
     mqtt,
     onDiagnostic,
     sessionGuard,
+    e2eeStorageKey,
+    e2eeDevicePath,
+    e2eeDeviceListCacheMs,
+    e2eeFrameLog,
+    e2ee,
     reconnect,
     license,
     requireLicense,
@@ -70,7 +75,14 @@ function createFacebookMqttClient(options = {}) {
       }
       return createFacebookMqttDriver({
         appState: mode === "appstate" ? credentials : undefined,
-        options: loginOptions || {},
+        options: {
+          ...(e2eeStorageKey === undefined ? {} : { e2eeStorageKey }),
+          ...(e2eeDevicePath === undefined ? {} : { e2eeDevicePath }),
+          ...(e2eeDeviceListCacheMs === undefined ? {} : { e2eeDeviceListCacheMs }),
+          ...(e2eeFrameLog === undefined ? {} : { e2eeFrameLog }),
+          ...(e2ee === undefined ? {} : { e2ee }),
+          ...(loginOptions || {})
+        },
         socketFactory,
         fetchImpl,
         userAgent: loginOptions?.userAgent || userAgent,
