@@ -31,7 +31,7 @@ test("normalizes reply, reaction, unsend, typing, read and presence delta classe
   assert.equal(normalizeMessengerDelta({ class: "MessageReaction", reaction: "❤️" }).type, "message_reaction");
   assert.equal(normalizeMessengerDelta({ class: "MessageUnsend" }).type, "message_unsend");
   assert.equal(normalizeMessengerDelta({ class: "Typing" }).type, "typ");
-  assert.equal(normalizeMessengerDelta({ class: "ReadReceipt" }).type, "read");
+  assert.equal(normalizeMessengerDelta({ class: "ReadReceipt" }).type, "read_receipt");
   assert.equal(normalizeMessengerDelta({ class: "PresenceUpdate" }).type, "presence");
   assert.equal(normalizeMessengerDelta({ class: "FutureDelta" }).type, "unknown_delta");
 });
