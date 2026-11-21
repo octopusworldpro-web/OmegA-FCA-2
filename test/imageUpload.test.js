@@ -3,6 +3,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { Readable } = require("node:stream");
+const fs = require("node:fs/promises");
+const os = require("node:os");
+const path = require("node:path");
 const { MAX_IMAGE_UPLOAD_BYTES, MAX_ATTACHMENT_DOWNLOAD_BYTES, readImageInput, readAttachmentInput, downloadAttachment, safeDownloadUrl } = require("../src/compat/imageUpload");
 
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
@@ -54,3 +57,20 @@ test("downloads only bounded HTTPS Facebook media URLs without credentials", asy
     maxBytes: 2, fetchImpl: async () => new Response(bytes, { status: 200 })
   }), /configured byte limit/);
 });
+
+test("reads local attachment paths with file-size and filename bounds", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omega-fca-upload-"));
+  const filePath = path.join(dir, "report.pdf");
+  try {
+    const pdf = Buffer.from("%PDF-1.7 local file");
+    await fs.writeFile(filePath, pdf);
+    const result = await readAttachmentInput(filePath);
+    assert.equal(result.fileName, "report.pdf");
+    assert.equal(result.mimeType, "application/pdf");
+    assert.equal(result.kind, "file");
+    await assert.rejects(readAttachmentInput(filePath, { maxBytes: 4 }), /10 MiB|byte limit/);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
