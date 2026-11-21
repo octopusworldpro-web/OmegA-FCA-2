@@ -337,6 +337,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       sessionGuard: typeof driver.sessionGuard === "function",
       e2ee: typeof driver.connectE2EE === "function" && typeof driver.sendE2EEMessage === "function"
     });
+    facade.logout = callback => logout(callback);
     facade.getConnectionState = () => supervisor.snapshot();
     facade.getLicense = () => verifiedLicense;
     api = Object.freeze(facade);
@@ -359,12 +360,10 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
     return loginPromise;
   }
 
-  return Object.freeze({
-    login,
-    logout() {
-      if (logoutPromise) return logoutPromise;
-      stopLicenseMonitor();
-      const pendingLogin = loginPromise;
+  function logout(callback) {
+    stopLicenseMonitor();
+    const pendingLogin = loginPromise;
+    if (!logoutPromise) {
       logoutPromise = (async () => {
         // If logout races authentication, wait for that attempt to settle and
         // then dispose any session it managed to establish.
@@ -380,8 +379,18 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       })().finally(() => {
         logoutPromise = null;
       });
-      return logoutPromise;
-    },
+    }
+    const operation = logoutPromise;
+    if (typeof callback === "function") {
+      operation.then(() => callback(null), error => callback(error));
+      return undefined;
+    }
+    return operation;
+  }
+
+  return Object.freeze({
+    login,
+    logout,
     getConnectionState: () => supervisor ? supervisor.snapshot() : Object.freeze({ state: "idle", connected: false, generation: 0 }),
     getLicense: () => verifiedLicense
   });
