@@ -66,6 +66,8 @@ The client exposes each method below only when the injected driver provides that
 | `getUserID(name)` | `threads` | Native typeahead lookup exists; GoatBot uses `getCurrentUserID()` for its own identity and `getUID()` in `pp.js`. |
 | `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `setTitle` | `groups` | Native AppState-backed web actions with synthetic tests; live acceptance is unverified. |
 | `createNewGroup` | `groups` | Native authenticated GraphQL group-create mutation with participant validation and normalized thread ID; synthetic request/response test added. Live acceptance is unverified. |
+| `changeAdminStatus`, `createPoll` | `groups` | Native authenticated group-admin and poll actions with input validation and synthetic tests; live acceptance is unverified. |
+| `handleMessageRequest`, `searchForThread`, `getThreadPictures` | `threads` | Native message-request routing, thread search and shared-photo retrieval with response validation and synthetic tests; live acceptance is unverified. |
 | `setMessageReaction` | `reactions` | Native AppState-backed web action with synthetic tests; live acceptance is unverified. |
 | `changeThreadColor`, `changeThreadEmoji` | `threads` | Native AppState-backed customization endpoints with synthetic tests; live acceptance is unverified. |
 
