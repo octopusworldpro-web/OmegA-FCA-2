@@ -29,8 +29,10 @@
 ## Public-FCA-style web action layer
 
 - Added AppState-session-backed `getThreadList`, `getThreadInfo`, `getThreadHistory`, and `getUserInfo` adapters using the legacy public FCA GraphQL-batch and `/chat/user_info/` conventions, with normalized responses, validation, pagination, and Promise/callback forms.
-- Added `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `setMessageReaction`, and `markAsRead` using public FCA request patterns. Wired into the first-party MQTT driver.
-- Synthetic request/response tests cover these adapters. Facebook private endpoints and document IDs are unofficial and may change; live account acceptance remains unverified. `createNewGroup` is intentionally not exposed until its request contract is evidenced.
+- Added `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `setMessageReaction`, `markAsRead`, `markAsDelivered`, `sendTypingIndicator`, `createNewGroup`, `changeGroupImage`, and `changeAvatar` using observed public FCA request patterns. Wired into the first-party MQTT driver.
+- Added bounded image input handling with JPEG/PNG/GIF/WebP signature detection and 10 MiB cap; group/profile image uploads validate returned IDs before applying changes. Generic message-attachment transfer remains unsupported.
+- Added authenticated `httpGet` and `httpPost` helpers with Promise and legacy error-first callback signatures. `httpGet` is exposed through the client facade and declared in TypeScript.
+- Synthetic request/response tests cover these adapters. Facebook private endpoints and document IDs are unofficial and may change; live account acceptance remains unverified.
 
 ## Not yet implemented — standalone personal FCA blockers
 
@@ -109,3 +111,9 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - The middleware starts a typing indicator, holds the incoming message for the configured reaction delay, then stops typing and delivers the event. It skips self messages (unless the Bot's self-listen filter allows them) and E2EE-marked events.
 - Pending typing timers are stopped when the listener detaches, errors, or the client disconnects.
 - Added unit tests and driver lifecycle tests. CI must verify this latest change before it is considered green.
+
+
+## Client facade compatibility verification — 2026-11-21
+
+- Added a regression test proving native `httpGet` is forwarded through the public client facade in both Promise/query and legacy callback signatures.
+- This is a deterministic adapter test only; the authenticated Facebook GET endpoint still requires owner-operated live AppState verification.
