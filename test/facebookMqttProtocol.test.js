@@ -163,3 +163,60 @@ test("honors an explicit MQTT keepalive for both CONNECT and PINGREQ timing", as
     global.clearInterval = originalClearInterval;
   }
 });
+
+
+test("closes a stale MQTT connection when PINGRESP is missing and resets on PINGRESP", async () => {
+  const originalSetInterval = global.setInterval;
+  const originalClearInterval = global.clearInterval;
+  const scheduled = [];
+  global.setInterval = (callback, delay) => {
+    const timer = { callback, delay, unref() {} };
+    scheduled.push(timer);
+    return timer;
+  };
+  global.clearInterval = () => {};
+  try {
+    const config = createFacebookMqttProtocol({ userId: "123456789", keepAlive: 4 });
+    const sent = [];
+    let closeCalls = 0;
+    const socket = {
+      readyState: 1,
+      send: frame => sent.push(Buffer.from(frame)),
+      once() {},
+      close() { closeCalls++; this.readyState = 3; }
+    };
+    await config.protocol.authenticate(socket, {
+      waitForFrame: async () => Buffer.from([0x20, 0x02, 0x00, 0x00])
+    });
+    await config.protocol.subscribe(socket, {
+      waitForFrame: async () => {
+        const subscribe = sent[sent.length - 1];
+        const remaining = mqtt.decodeRemainingLength(subscribe);
+        const id = subscribe.readUInt16BE(remaining.offset);
+        return Buffer.from([0x90, 0x03, id >> 8, id & 0xff, 0x01]);
+      }
+    });
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].delay, 2000);
+
+    scheduled[0].callback();
+    assert.equal(mqtt.decodePacket(sent.at(-1)).type, "pingreq");
+    config.protocol.decodeFrame(Buffer.from([0xd0, 0x00]));
+    scheduled[0].callback();
+    assert.equal(mqtt.decodePacket(sent.at(-1)).type, "pingreq");
+    assert.equal(closeCalls, 0);
+
+    scheduled[0].callback();
+    assert.equal(closeCalls, 1);
+  } finally {
+    global.setInterval = originalSetInterval;
+    global.clearInterval = originalClearInterval;
+  }
+});
+
+test("validates MQTT keepalive range and allows zero to disable heartbeats", () => {
+  for (const keepAlive of [-1, 1.5, 65536, NaN]) {
+    assert.throws(() => createFacebookMqttProtocol({ userId: "123456789", keepAlive }), /keepAlive must be an integer/);
+  }
+  assert.doesNotThrow(() => createFacebookMqttProtocol({ userId: "123456789", keepAlive: 0 }));
+});
