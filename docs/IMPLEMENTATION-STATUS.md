@@ -148,3 +148,11 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - Added regression coverage for reply metadata/correlation, send rejection, edit rejection, share-contact response correlation, unsend/read/seen/delivery receipts, read watermark metadata, concurrent request isolation and request-ID wraparound. Updated public TypeScript signatures for edit, unsend and receipt methods.
 - GitHub Actions run #325 (`44878685676`) passed on Node.js 20 and 22: 384 tests passed, 0 failed on each runtime; syntax checks, package root export smoke test, and publishable package verification passed.
 - This is synthetic CI verification only. No authorized live Facebook account, recipient-confirmed message delivery, edit/unsend acceptance, or production receipt acceptance has been run; those remain owner-operated live acceptance checks.
+
+
+## Group, thread and user API progress — 2026-11-21
+
+- Audited the existing first-party thread adapter, public client facade, TypeScript declarations, and Eryxen parity matrix before adding code. Existing coverage already includes bounded thread list/history pagination, thread/profile lookup, group creation and membership, nicknames, admin status, polls, thread customization, friend-list lookup, friend-request decisions, block/unfriend actions, and read/seen/delivery receipts.
+- Added a validated Lightspeed pin/unpin task builder using the observed labels 430/431 and queue names `pin_msg_v2_<threadID>` / `unpin_msg_v2_<threadID>`. Exposed `pinMessage(messageID, threadID)` and `unpinMessage(messageID, threadID)` on the native driver and client facade, added TypeScript declarations, root export for the request builder, and deterministic payload tests.
+- Pin/unpin task shape is community-observed and is not claimed live-verified. The remaining parity gaps from the current audit include `sendFriendRequest`, `followUser`, `unfollowUser`, `postComment`, and `sharePost`; these must not be reported as complete until implemented and tested. Avoid speculative endpoint substitutions.
+- A fresh Node 20/22 CI run is required for the pin/unpin implementation before code verification is considered green. No authorized live Facebook acceptance has been run.
