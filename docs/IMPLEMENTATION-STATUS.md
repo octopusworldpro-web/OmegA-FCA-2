@@ -117,3 +117,11 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 
 - Added a regression test proving native `httpGet` is forwarded through the public client facade in both Promise/query and legacy callback signatures.
 - This is a deterministic adapter test only; the authenticated Facebook GET endpoint still requires owner-operated live AppState verification.
+
+
+## Serial workflow checkpoint — Step 2 complete (2026-11-21)
+
+- The primary current comparison target is `@eryxenx/fca@1.3.5` (public npm README), not only the separately named historical `fca-eryxenx` quick-reference package.
+- A method-by-method source audit is recorded in [ERYXEN-API-PARITY-MATRIX.md](ERYXEN-API-PARITY-MATRIX.md). It distinguishes implemented source paths, adapters, partial semantics, missing methods and live-unverified behavior.
+- Definite public API gaps recorded for later implementation: `pinMessage`, `unpinMessage`, `sendFriendRequest`, `followUser`, `unfollowUser`, `postComment`, `sharePost`, `uploadImageToImgbb`, and a distinct `listenE2EE` API. E2EE reaction/typing/unsend/edit/mark-read parity is also incomplete.
+- Step 2 is an audit/documentation gate only. It does not claim those missing methods are implemented or that Facebook live-account acceptance has passed.
