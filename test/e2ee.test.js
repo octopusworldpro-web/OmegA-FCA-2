@@ -75,7 +75,7 @@ test("E2EE HTTP adapter sends session cookies only to Facebook hosts", async () 
   const session = {
     getCookieHeader(url) {
       const host = new URL(url).hostname;
-      if (!/(^|\\.)facebook\\.com$/i.test(host)) throw new TypeError("cookie host denied");
+      if (!/(^|\.)facebook\.com$/i.test(host)) throw new TypeError("cookie host denied");
       return "c_user=123; xs=secret";
     }
   };
