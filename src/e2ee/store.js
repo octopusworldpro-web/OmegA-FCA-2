@@ -3,6 +3,14 @@
 var fs = require("fs");
 var path = require("path");
 var cryptoUtils = require("./crypto");
+var crypto = require("crypto");
+
+function normalizeStorageKey(value) {
+  if (value == null) return null;
+  if (typeof value === "string" && /^[a-f0-9]{64}$/i.test(value)) return Buffer.from(value, "hex");
+  if ((Buffer.isBuffer(value) || value instanceof Uint8Array) && value.byteLength === 32) return Buffer.from(value);
+  throw new TypeError("E2EE storage key must be 32 bytes or exactly 64 hexadecimal characters");
+}
 
 function b64(buf) {
   return Buffer.from(buf).toString("base64");
@@ -162,7 +170,20 @@ DeviceStore.prototype.save = function() {
     e2ee_history: this.history,
     backup: this.backup
   };
-  fs.writeFileSync(this.path, JSON.stringify(data, null, 2), { mode: 384 });
+  var plaintext = Buffer.from(JSON.stringify(data));
+  var iv = crypto.randomBytes(12);
+  var cipher = crypto.createCipheriv("aes-256-gcm", this.encryptionKey, iv);
+  var ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  var envelope = {
+    format: "omega-fca-e2ee-store",
+    version: 1,
+    algorithm: "aes-256-gcm",
+    iv: b64(iv),
+    tag: b64(cipher.getAuthTag()),
+    ciphertext: b64(ciphertext)
+  };
+  fs.writeFileSync(this.path, JSON.stringify(envelope), { mode: 384 });
+  try { fs.chmodSync(this.path, 384); } catch (e) { /* platform may not support chmod */ }
 };
 
 DeviceStore.prototype.load = function(data) {
