@@ -201,19 +201,37 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
 
   function getThreadList(limit, timestamp = null, tags = [], callback) {
     if (typeof tags === "function") { callback = tags; tags = []; }
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new TypeError("getThreadList limit must be an integer from 1 to 100");
+    // Legacy FCA callers commonly use a very large limit as an "all threads"
+    // sentinel. Fetch in bounded pages instead of sending that value to GraphQL.
+    if (!Number.isInteger(limit) || limit < 1) throw new TypeError("getThreadList limit must be a positive integer");
+    const requestedLimit = Math.min(limit, 10000);
     if (timestamp !== null && (!Number.isSafeInteger(timestamp) || timestamp < 0)) throw new TypeError("getThreadList timestamp must be an integer or null");
     if (typeof tags === "string") tags = [tags];
     if (!Array.isArray(tags) || tags.some(tag => typeof tag !== "string" || tag.length > 32)) throw new TypeError("getThreadList tags must be an array of strings");
     const operation = (async () => {
-      const data = await graph({
-        limit: limit + (timestamp ? 1 : 0), before: timestamp, tags,
-        includeDeliveryReceipts: true, includeSeqID: false
-      }, DOC_IDS.threadList, "getThreadList");
-      const nodes = data?.viewer?.message_threads?.nodes;
-      if (!Array.isArray(nodes)) throw createFacebookError("getThreadList: response is missing message_threads.nodes", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
-      if (timestamp) nodes.shift();
-      return nodes.map(formatThread);
+      const result = [];
+      let before = timestamp;
+      let firstPage = true;
+      let previousCursor = null;
+      while (result.length < requestedLimit) {
+        const pageSize = Math.min(100, requestedLimit - result.length);
+        const data = await graph({
+          limit: pageSize + (before !== null ? 1 : 0), before, tags,
+          includeDeliveryReceipts: true, includeSeqID: false
+        }, DOC_IDS.threadList, "getThreadList");
+        const nodes = data?.viewer?.message_threads?.nodes;
+        if (!Array.isArray(nodes)) throw createFacebookError("getThreadList: response is missing message_threads.nodes", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+        if (before !== null && nodes.length) nodes.shift();
+        const page = nodes.slice(0, pageSize);
+        result.push(...page.map(formatThread));
+        if (page.length < pageSize || result.length >= requestedLimit) break;
+        const cursor = Number(page.at(-1)?.updated_time_precise);
+        if (!Number.isSafeInteger(cursor) || cursor < 0 || (previousCursor !== null && cursor >= previousCursor)) break;
+        previousCursor = cursor;
+        before = cursor;
+        firstPage = false;
+      }
+      return result;
     })();
     return callbackResult(operation, callback);
   }
@@ -234,20 +252,35 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
   function getThreadHistory(threadID, amount, timestamp, callback) {
     if (typeof timestamp === "function") { callback = timestamp; timestamp = undefined; }
     const thread = id(threadID, "threadID");
-    if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new TypeError("getThreadHistory amount must be an integer from 1 to 100");
+    if (!Number.isInteger(amount) || amount < 1) throw new TypeError("getThreadHistory amount must be a positive integer");
+    const requestedAmount = Math.min(amount, 1000);
     if (timestamp !== undefined && timestamp !== null && (!Number.isSafeInteger(Number(timestamp)) || Number(timestamp) < 0)) {
       throw new TypeError("getThreadHistory timestamp must be an integer, null, or undefined");
     }
     const operation = (async () => {
-      const data = await graph({
-        id: thread, message_limit: amount, load_messages: 1, load_read_receipts: false,
-        before: timestamp == null ? null : Number(timestamp)
-      }, DOC_IDS.threadHistory, "getThreadHistory");
-      const raw = data?.message_thread;
-      const nodes = raw?.messages?.nodes;
-      if (!Array.isArray(nodes)) throw createFacebookError("getThreadHistory: response is missing messages.nodes", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
-      const isGroup = raw.thread_type === "GROUP";
-      return nodes.map(message => formatMessage(message, thread, isGroup)).filter(message => message.messageID);
+      const result = [];
+      let before = timestamp == null ? null : Number(timestamp);
+      let previousCursor = null;
+      while (result.length < requestedAmount) {
+        const pageSize = Math.min(100, requestedAmount - result.length);
+        const data = await graph({
+          id: thread, message_limit: pageSize + (before !== null ? 1 : 0), load_messages: 1,
+          load_read_receipts: false, before
+        }, DOC_IDS.threadHistory, "getThreadHistory");
+        const raw = data?.message_thread;
+        const nodes = raw?.messages?.nodes;
+        if (!Array.isArray(nodes)) throw createFacebookError("getThreadHistory: response is missing messages.nodes", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+        if (before !== null && nodes.length) nodes.shift();
+        const page = nodes.slice(0, pageSize);
+        const isGroup = raw.thread_type === "GROUP";
+        result.push(...page.map(message => formatMessage(message, thread, isGroup)).filter(message => message.messageID));
+        if (page.length < pageSize || result.length >= requestedAmount) break;
+        const cursor = Number(page.at(-1)?.timestamp_precise);
+        if (!Number.isSafeInteger(cursor) || cursor < 0 || (previousCursor !== null && cursor >= previousCursor)) break;
+        previousCursor = cursor;
+        before = cursor;
+      }
+      return result.slice(0, requestedAmount);
     })();
     return callbackResult(operation, callback);
   }
