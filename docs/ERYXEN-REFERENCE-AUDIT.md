@@ -185,3 +185,9 @@ These additions are source-level implementations and deterministic tests; Facebo
 - `saveSession()` now writes the active AppState to the encrypted SessionGuard snapshot.
 - `restoreSessionBackup()` reads the encrypted backup, verifies the stored account ID, applies the restored cookies to the active session, refreshes Facebook web tokens, and re-saves the restored session. A failed refresh rolls the active cookie jar back.
 - Session backup restore never writes to GoatBot's plaintext `account.txt`; the encrypted sidecar and its backup remain separate.
+
+
+### Additional FCA utility compatibility update
+
+- `httpPostFormData(url, formData, callback?)` is now exposed through the native authenticated Facebook/Messenger web client. It retains the existing HTTPS host allowlist, request bounds, session cookie scope, and response normalization.
+- `addExternalModule(module)` now supports validated, non-conflicting custom methods on the frozen FCA facade. Extension functions are bound to the FCA API and cannot replace built-in methods.

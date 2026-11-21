@@ -438,3 +438,29 @@ test("native driver exposes encrypted saveSession and account-bound restoreSessi
   }
 });
 
+test("native driver exposes callback-compatible saveSession and bounded multipart HTTP", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-multipart-"));
+  const filePath = path.join(directory, "session.enc");
+  let driver;
+  try {
+    driver = await createFacebookMqttDriver({
+      appState, fetchImpl: async () => htmlResponse(),
+      socketFactory: () => new FakeWebSocket(), mqtt: { keepAlive: 0 },
+      sessionGuard: { filePath, key: "1".repeat(64), intervalMs: 60_000 }
+    });
+    const savedPath = await new Promise((resolve, reject) => {
+      driver.saveSession((error, value) => error ? reject(error) : resolve(value));
+    });
+    assert.equal(savedPath, filePath);
+    const response = await driver.httpPostFormData(
+      "https://www.facebook.com/ajax/mercury/upload.php",
+      new FormData()
+    );
+    assert.equal(response.status, 200);
+    await assert.rejects(driver.httpPostFormData("https://example.com/upload", new FormData()), /Facebook\/Messenger HTTPS/);
+  } finally {
+    if (driver) await driver.disconnect();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+

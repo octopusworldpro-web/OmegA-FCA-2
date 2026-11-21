@@ -711,37 +711,42 @@ async function createFacebookMqttDriver({
         return Object.freeze({ ...runtimeOptions });
       },
       getSessionState: () => session.state,
-      saveSession: () => {
+      saveSession: callback => {
         if (!guard) {
           const error = new Error("Encrypted SessionGuard is not configured");
           error.code = "FCA_SESSION_GUARD_MISSING";
           throw error;
         }
-        return guard.saveNow();
+        return callbackResult(guard.saveNow(), callback);
       },
-      restoreSessionBackup: async () => {
-        if (!guard) {
-          const error = new Error("Encrypted SessionGuard is not configured");
-          error.code = "FCA_SESSION_GUARD_MISSING";
-          throw error;
-        }
-        const snapshot = guard.restoreBackup();
-        if (!snapshot || snapshot.version !== 1 || String(snapshot.userId) !== String(session.userId) ||
-            !Array.isArray(snapshot.appState) || snapshot.appState.length === 0) {
-          const error = new Error("Encrypted SessionGuard backup is invalid or belongs to another account");
-          error.code = "FCA_SESSION_RESTORE_FAILED";
-          throw error;
-        }
-        const previous = session.getAppState();
-        try {
-          await session.replaceAppState(snapshot.appState);
-          await guard.saveNow();
-          return Object.freeze({ restored: true, userId: session.userId, cookieCount: session.getAppState().length });
-        } catch (error) {
-          try { await session.replaceAppState(previous); } catch {}
-          throw error;
-        }
+      restoreSessionBackup: callback => {
+        const operation = (async () => {
+          if (!guard) {
+            const error = new Error("Encrypted SessionGuard is not configured");
+            error.code = "FCA_SESSION_GUARD_MISSING";
+            throw error;
+          }
+          const snapshot = guard.restoreBackup();
+          if (!snapshot || snapshot.version !== 1 || String(snapshot.userId) !== String(session.userId) ||
+              !Array.isArray(snapshot.appState) || snapshot.appState.length === 0) {
+            const error = new Error("Encrypted SessionGuard backup is invalid or belongs to another account");
+            error.code = "FCA_SESSION_RESTORE_FAILED";
+            throw error;
+          }
+          const previous = session.getAppState();
+          try {
+            await session.replaceAppState(snapshot.appState);
+            await guard.saveNow();
+            return Object.freeze({ restored: true, userId: session.userId, cookieCount: session.getAppState().length });
+          } catch (error) {
+            try { await session.replaceAppState(previous); } catch {}
+            throw error;
+          }
+        })();
+        return callbackResult(operation, callback);
       },
+      httpPostFormData: (url, formData, callback) =>
+        callbackResult(Promise.resolve().then(() => webClient.postMultipart(url, formData)), callback),
       sessionGuard: (requestedPath, legacyOptions = {}) => {
         if (!guard) throw new Error("Encrypted SessionGuard is not configured; set FCA_SESSION_FILE and FCA_SESSION_KEY or pass sessionGuard.filePath/key");
         const paths = guard.getPaths();

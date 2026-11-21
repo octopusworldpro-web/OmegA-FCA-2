@@ -20,7 +20,7 @@ const METHOD_FEATURES = Object.freeze({
 });
 
 const DRIVER_METHODS = [
-  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "saveSession", "restoreSessionBackup", "setOptions",
+  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "httpPostFormData", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "saveSession", "restoreSessionBackup", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeBlockedStatus", "changeBio", "unfriend", "getEmojiUrl", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
@@ -332,7 +332,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
     facade.sessionGuard = typeof driver.sessionGuard === "function" ? driver.sessionGuard.bind(driver) : undefined;
     facade.setOptions = typeof driver.setOptions === "function" ? driver.setOptions.bind(driver) : undefined;
     facade.getCapabilities = () => Object.freeze({
-      methods: Object.freeze(DRIVER_METHODS.filter(method => typeof driver[method] === "function")),
+      methods: Object.freeze([...DRIVER_METHODS.filter(method => typeof driver[method] === "function"), "addExternalModule"]),
       events: typeof driver.listen === "function",
       sessionGuard: typeof driver.sessionGuard === "function",
       e2ee: typeof driver.connectE2EE === "function" && typeof driver.sendE2EEMessage === "function"
@@ -353,10 +353,33 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
         downloadAttachment: typeof facade.downloadE2EEAttachment === "function" ? facade.downloadE2EEAttachment : undefined
       });
     }
+    const externalMethods = new Map();
+    facade.addExternalModule = module => {
+      if (!module || typeof module !== "object" || Array.isArray(module)) {
+        throw new TypeError("addExternalModule requires an object of named functions");
+      }
+      const names = [];
+      for (const [name, method] of Object.entries(module)) {
+        if (!/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/.test(name) ||
+            ["__proto__", "prototype", "constructor", "addExternalModule"].includes(name) ||
+            Object.prototype.hasOwnProperty.call(facade, name) ||
+            externalMethods.has(name) || typeof method !== "function") {
+          throw new TypeError("External FCA module contains an invalid, duplicate, or reserved method: " + name);
+        }
+        externalMethods.set(name, method.bind(facade));
+        names.push(name);
+      }
+      return Object.freeze(names);
+    };
     facade.logout = callback => logout(callback);
     facade.getConnectionState = () => supervisor.snapshot();
     facade.getLicense = () => verifiedLicense;
-    api = Object.freeze(facade);
+    api = new Proxy(Object.freeze(facade), {
+      get(target, property, receiver) {
+        if (typeof property === "string" && externalMethods.has(property)) return externalMethods.get(property);
+        return Reflect.get(target, property, receiver);
+      }
+    });
     startLicenseMonitor();
     return api;
   }

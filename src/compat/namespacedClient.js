@@ -52,7 +52,7 @@ function createFcaClient(api) {
     ["getCurrentUserID", "getCurrentUserId"], ["getAppState"],
     ["getCookies"], ["refreshFb_dtsg", "refreshDtsg"],
     ["setOptions"], ["logout"], ["saveSession"], ["restoreSessionBackup"],
-    ["stopSessionGuard"]
+    ["stopSessionGuard"], ["addExternalModule"]
   ]);
 
   return Object.freeze({ messages, threads, users, account });

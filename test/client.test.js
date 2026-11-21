@@ -377,3 +377,27 @@ test("FCA API exposes E2EE namespace and legacy group creation alias", async () 
   await client.logout();
 });
 
+test("addExternalModule safely registers non-conflicting bound API extensions", async () => {
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  assert.deepEqual(api.addExternalModule({
+    customIdentity() { return this.getCurrentUserID(); },
+    customValue() { return 42; }
+  }), ["customIdentity", "customValue"]);
+  assert.equal(api.customIdentity(), "123456");
+  assert.equal(api.customValue(), 42);
+  assert.throws(() => api.addExternalModule({ sendMessage() {} }), /invalid, duplicate, or reserved/);
+  assert.throws(() => api.addExternalModule({ bad: "not a function" }), /invalid, duplicate, or reserved/);
+  await client.logout();
+});
+

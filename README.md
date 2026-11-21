@@ -205,3 +205,16 @@ bot.launch();
 ```
 
 `createMessengerBot` uses the same owner-supplied AppState/session login and FCA transport. It does not bypass Facebook checkpoints or provide credential login.
+
+
+Custom API extensions can be registered without mutating the frozen FCA facade:
+
+```js
+api.addExternalModule({
+  async replyToOwner(message) {
+    return this.sendMessage(message, OWNER_THREAD_ID);
+  }
+});
+```
+
+The registered functions are bound to the FCA API object and cannot replace built-in methods.
