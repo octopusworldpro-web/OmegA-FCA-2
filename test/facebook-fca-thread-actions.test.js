@@ -67,7 +67,7 @@ test("getThreadPictures retrieves bounded shared-photo metadata and detail", asy
     }
     assert.deepEqual(body, { thread_id: "123456789012345", image_id: "987654321" });
     const data = {
-      query_metadata: { query_path: ["message_thread"] },
+      query_metadata: { query_path: [{ message_thread: "message_thread" }] },
       query_results: { message_thread: { message_images: { edges: [{ node: { image2: photo } }] } } }
     };
     return { payload: { jsmods: { require: [[null, null, null, [null, data]]] } } };
