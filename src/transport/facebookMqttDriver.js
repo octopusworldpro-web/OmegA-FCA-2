@@ -10,6 +10,7 @@ const { createFacebookWebClient } = require("../auth/facebookWebClient");
 const { readImageInput, readAttachmentInput, downloadAttachment: downloadAttachmentFile, MAX_ATTACHMENT_COUNT } = require("../compat/imageUpload");
 const { offlineThreadingId, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
 const { createHumanizer } = require("../compat/humanizer");
+const { createBroadcastSender } = require("../compat/broadcast");
 
 /**
  * Builds an owner-authorized personal Messenger MQTT driver.
@@ -341,9 +342,20 @@ async function createFacebookMqttDriver({
       return callbackResult(operation, callback);
     }
 
+    const sendBroadcast = createBroadcastSender({
+      sendMessage: (message, threadID) => {
+        if (message && typeof message === "object" &&
+            (message.attachment != null || message.url != null)) {
+          return sendAttachmentMessage({ threadID, message });
+        }
+        return driver.sendMessage({ threadID, message });
+      }
+    });
+
     return Object.freeze({
       ...driver,
       ...threadApi,
+      sendBroadcast,
       listen: callback => {
         if (typeof callback !== "function") throw new TypeError("listener callback is required");
         if (!humanizer) humanizer = createHumanizer({
