@@ -123,7 +123,7 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 
 - The primary current comparison target is `@eryxenx/fca@1.3.5` (public npm README), not only the separately named historical `fca-eryxenx` quick-reference package.
 - A method-by-method source audit is recorded in [ERYXEN-API-PARITY-MATRIX.md](ERYXEN-API-PARITY-MATRIX.md). It distinguishes implemented source paths, adapters, partial semantics, missing methods and live-unverified behavior.
-- Definite public API gaps recorded for later implementation: `pinMessage`, `unpinMessage`, `sendFriendRequest`, `followUser`, `unfollowUser`, `postComment`, `sharePost`, `uploadImageToImgbb`, and a distinct `listenE2EE` API. E2EE reaction/typing/unsend/edit/mark-read parity is also incomplete.
+- Remaining public API gap recorded for later implementation: `uploadImageToImgbb` (not substituted with a different upload host). Step 8 has since added the distinct E2EE listener and one-to-one reaction/typing/unsend/edit controls; E2EE mark-read and group Sender Keys remain unsupported.
 - Step 2 is an audit/documentation gate only. It does not claim those missing methods are implemented or that Facebook live-account acceptance has passed.
 
 
@@ -156,3 +156,16 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - Added a validated Lightspeed pin/unpin task builder using the observed labels 430/431 and queue names `pin_msg_v2_<threadID>` / `unpin_msg_v2_<threadID>`. Exposed `pinMessage(messageID, threadID)` and `unpinMessage(messageID, threadID)` on the native driver and client facade, added TypeScript declarations, root export for the request builder, and deterministic payload tests. Added native Comet mutations for `sendFriendRequest`, `followUser`, `unfollowUser`, text-only `postComment`, and `sharePost` (feed-to-feed reshare), with error normalization and deterministic request/response tests. The namespaced client exposes thread pin/unpin aliases and a `posts` namespace for social actions. Fixed the CI-discovered regex escaping, namespace source escaping, and synchronous validation test expectation.
 - Pin/unpin task shape is community-observed and is not claimed live-verified. The remaining parity gaps from the current audit include `sendFriendRequest`, `followUser`, `unfollowUser`, `postComment`, and `sharePost`; these must not be reported as complete until implemented and tested. Avoid speculative endpoint substitutions.
 - A fresh Node 20/22 CI run is required for this corrected implementation batch before code verification is considered green. No authorized live Facebook acceptance has been run; all private Comet/Lightspeed endpoints remain live-unverified.
+
+
+## Step 8 — E2EE & Advanced Compatibility checkpoint (2026-11-21)
+
+- [x] Dedicated E2EE-only listener exposed as `listenE2EE` and `api.e2ee.listen()`.
+- [x] One-to-one E2EE reaction add/remove, edit, unsend and typing start/stop operations added to the Noise/Signal encrypted path.
+- [x] Operations reject unknown/group threads instead of falling back to plaintext or pretending group Sender Keys exist.
+- [x] Public facade, namespaced E2EE API, TypeScript declarations and usage docs updated.
+- [x] Synthetic payload/frame tests added for E2EE control operations; existing crypto, media integrity, storage encryption and cookie-isolation tests retained.
+- [ ] E2EE mark-read, group Sender Keys/group media, Labyrinth backup/restore and key-transparency verification remain outside the current implementation.
+- [ ] Authorized live Facebook account acceptance (device registration, Noise handshake, reaction/edit/unsend/typing send/receive) remains required before production claims.
+
+**Status:** Core one-to-one E2EE compatibility implementation is in place. This is not a claim of full Messenger E2EE support; group encryption and encrypted backup/key-transparency capabilities remain explicit gaps.
