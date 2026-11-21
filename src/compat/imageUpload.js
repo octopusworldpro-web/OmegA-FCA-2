@@ -168,8 +168,7 @@ async function downloadAttachment(input, options = {}) {
     }
     const declared = Number(response.headers?.get?.("content-length") || 0);
     if (declared > maxBytes) throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > maxBytes) throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+    const buffer = await readResponseBytes(response, maxBytes);
     return Object.freeze({
       buffer, size: buffer.length,
       mimeType: (response.headers?.get?.("content-type") || "application/octet-stream").split(";")[0].trim().toLowerCase(),
