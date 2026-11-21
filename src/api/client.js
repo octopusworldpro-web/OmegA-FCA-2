@@ -9,7 +9,7 @@ const { classifySessionState } = require("../security/sessionState");
 const METHOD_FEATURES = Object.freeze({
   sendRequest: "messaging", sendMessage: "messaging", editMessage: "messaging",
   shareContact: "messaging", uploadAttachment: "messaging", downloadAttachment: "messaging", forwardAttachment: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
-  markAsDelivered: "messaging", sendTypingIndicator: "messaging",
+  markAsDelivered: "messaging", markAsReadAll: "messaging", markAsSeen: "messaging", deleteMessage: "messaging", deleteThread: "threads", muteThread: "threads", changeArchivedStatus: "threads", sendTypingIndicator: "messaging",
   getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
   getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads",
   getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads",
@@ -21,7 +21,7 @@ const METHOD_FEATURES = Object.freeze({
 
 const DRIVER_METHODS = [
   "sendRequest", "sendMessage", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
-  "markAsRead", "markAsDelivered", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
+  "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
 ];
