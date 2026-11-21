@@ -1,12 +1,9 @@
 name: Publish OmegA-FCA to GitHub Packages
 
+# Manual-only until the package namespace/owner and GitHub Packages installation
+# are aligned. The project publishes to npmjs from publish-npm.yml on version tags.
 on:
-  push:
-    branches: [main]
-    paths:
-      - package.json
-      - package-lock.json
-      - .github/workflows/publish.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
