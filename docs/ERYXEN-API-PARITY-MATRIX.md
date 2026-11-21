@@ -129,10 +129,10 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 |---|---|
 | `selfListen`, `listenEvents`, `listenTyping`, `updatePresence` | Implemented for supported event filters |
 | `autoMarkDelivery`, `autoMarkRead` | Implemented |
-| `autoReconnect` | Reconnect supervisor exists; exact option-to-supervisor mapping requires a dedicated test |
+| `autoReconnect` | Partial | Reconnect supervisor exists and reconnects on transport failure; the reference boolean option is not mapped as a verified per-login disable switch. |
 | `userAgent` | Implemented / forwarded to authenticated web client |
 | `proxy` | Unsupported in current native transport; must fail/document explicitly rather than silently claim parity |
-| `online` | Not verified / no parity claim |
+| `online` | Implemented | Login option is passed into MQTT protocol metadata as `chat_on`; live presence behavior remains unverified. |
 | `emitReady` | Not verified / no parity claim |
 | Reference `humanize` options | Partial; OmegA has its own humanizer and option schema, not guaranteed drop-in equivalent |
 
