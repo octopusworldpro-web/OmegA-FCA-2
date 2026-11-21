@@ -48,6 +48,7 @@ The client exposes each method below only when the injected driver provides that
 
 | Method | License feature gate (when licensing enabled) | Current status |
 |---|---|---|
+| `sendBroadcast` | `messaging` | Bounded parallel-batch broadcast with per-recipient results and callback support; synthetic helper tests added. |
 | `sendMessage` | `messaging` | Text/sticker/reply via native MQTT; attachment and URL sends via authenticated legacy Messenger upload/send flow. Synthetic upload/send tests exist; live broker/recipient acceptance remains unverified. |
 | `markAsRead`, `markAsReadAll`, `markAsSeen` | `messaging` | Native authenticated receipt actions with synthetic request/response tests; live endpoint acceptance is unverified. |
 | `deleteMessage` | `messaging` | Native delete-for-me endpoint, deliberately distinct from `unsendMessage`; synthetic tests exist, live acceptance is unverified. |

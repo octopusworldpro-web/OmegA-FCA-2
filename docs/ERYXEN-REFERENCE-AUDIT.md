@@ -134,3 +134,8 @@ The native adapter now also implements `changeAdminStatus`, `createPoll`, `handl
 The native adapter also now implements `changeBlockedStatus`, `changeBio`, `unfriend` and `getEmojiUrl`. The first three use authenticated Facebook web actions/GraphQL and reject Facebook-declared failures; `getEmojiUrl` computes the Facebook emoji asset URL locally. Their declarations and synthetic regression tests are included. The legacy bio GraphQL document ID and all account mutation endpoints require authorized live-account acceptance before being treated as stable.
 
 The current new-method test batch passes 346/346 tests on Node.js 20 and Node.js 22; syntax checks, package-root export smoke tests and publishable-package checks also pass on both versions (CI run 44867338258).
+
+
+### Multi-thread broadcast helper (2026-11-21)
+
+`sendBroadcast(message, threadIDs, options?, callback?)` is now available through the native driver and client facade. It validates unique numeric thread IDs, bounds recipient count, delay and parallelism, processes recipients in bounded parallel batches, calls `onEach(error, result, threadID)` per recipient, and returns `{ total, sent, failed, results }` so partial failures are visible. It reuses the native text/attachment send paths rather than inventing a second transport. Unit tests cover partial failures, pacing configuration, validation and callback overloads.
