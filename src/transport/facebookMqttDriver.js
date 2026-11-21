@@ -7,7 +7,7 @@ const { createFacebookMqttProtocol } = require("./facebookMqttProtocol");
 const { createNativeRealtimeTransport } = require("./nativeRealtimeTransport");
 const { createFacebookThreadApi } = require("./facebookThreadApi");
 const { createFacebookWebClient } = require("../auth/facebookWebClient");
-const { readImageInput } = require("../compat/imageUpload");
+const { readImageInput, readAttachmentInput, downloadAttachment: downloadAttachmentFile, MAX_ATTACHMENT_COUNT } = require("../compat/imageUpload");
 const { createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
 const { createHumanizer } = require("../compat/humanizer");
 
@@ -178,6 +178,162 @@ async function createFacebookMqttDriver({
         active.close();
       }
     };
+    async function uploadAttachments(input) {
+      const items = Array.isArray(input) ? input : [input];
+      if (!items.length || items.length > MAX_ATTACHMENT_COUNT) throw new RangeError("Attachment count must be between 1 and 10");
+      const files = [];
+      for (const item of items) files.push(await readAttachmentInput(item));
+      const form = new FormData();
+      form.append("voice_clip", "false");
+      files.forEach((file, index) => form.append("upload_" + index, new Blob([file.buffer], { type: file.mimeType }), file.fileName));
+      const response = await webClient.postMultipart("https://upload.facebook.com/ajax/mercury/upload.php", form);
+      const metadata = response?.payload?.metadata;
+      const entries = Array.isArray(metadata) ? metadata :
+        (metadata && typeof metadata === "object" ? Object.keys(metadata).sort((a,b) => Number(a)-Number(b)).map(key => metadata[key]) : []);
+      if (entries.length !== files.length) {
+        const error = new Error("Facebook did not confirm every uploaded attachment");
+        error.code = "FCA_ATTACHMENT_UPLOAD_INCOMPLETE";
+        throw error;
+      }
+      return entries.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          const error = new Error("Facebook returned malformed attachment metadata");
+          error.code = "FCA_RESPONSE_SHAPE_INVALID";
+          throw error;
+        }
+        const idKey = ["image_id", "video_id", "audio_id", "file_id", "gif_id"].find(key => entry[key] != null);
+        if (!idKey || !/^\d{1,40}$/.test(String(entry[idKey]))) {
+          const error = new Error("Facebook did not return a supported attachment ID");
+          error.code = "FCA_RESPONSE_SHAPE_INVALID";
+          throw error;
+        }
+        const type = idKey === "image_id" ? "image" : idKey === "video_id" ? "video" :
+          idKey === "audio_id" ? "audio" : idKey === "gif_id" ? "gif" : "file";
+        return Object.freeze({
+          attachmentID: String(entry[idKey]), id: String(entry[idKey]),
+          idKey, type, fileName: files[index].fileName,
+          mimeType: files[index].mimeType, size: files[index].size,
+          attachmentUrl: typeof entry.attachmentUrl === "string" ? entry.attachmentUrl : null,
+          metadata: entry
+        });
+      });
+    }
+
+    async function sendAttachmentMessage(input) {
+      const threadID = String(input?.threadID ?? "");
+      if (!/^\d{5,30}$/.test(threadID)) throw new TypeError("threadID must be a numeric Facebook ID");
+      const message = typeof input.message === "string" ? { body: input.message } : input.message;
+      if (!message || typeof message !== "object" || Array.isArray(message)) throw new TypeError("message must be a string or message object");
+      const body = message.body == null ? "" : String(message.body);
+      if (Buffer.byteLength(body, "utf8") > 20000) throw new RangeError("message body exceeds 20000 bytes");
+      const hasFiles = message.attachment != null;
+      const hasUrl = message.url != null;
+      if (hasFiles && hasUrl) throw new TypeError("A message can contain attachments or a share URL, not both");
+      if (!hasFiles && !hasUrl) throw new TypeError("Attachment message requires attachment or url");
+      const form = {
+        client: "mercury", action_type: "ma-type:user-generated-message",
+        author: "fbid:" + session.userId,
+        timestamp: Date.now(), timestamp_absolute: "Today",
+        timestamp_relative: "0 minutes ago", timestamp_time_passed: "0",
+        is_unread: false, is_cleared: false, is_forward: false,
+        is_filtered_content: false, is_filtered_content_bh: false,
+        is_filtered_content_account: false, is_filtered_content_quasar: false,
+        is_filtered_content_invalid_app: false, is_spoof_warning: false,
+        source: "source:chat:web", "source_tags[0]": "source:chat",
+        body, html_body: false, ui_push_phase: "V3", status: "0",
+        offline_threading_id: offlineThreadingId(), message_id: offlineThreadingId(),
+        threading_id: offlineThreadingId(), "ephemeral_ttl_mode:": "0",
+        manual_retry_cnt: "0", has_attachment: true
+      };
+      if (threadID.length === 15) {
+        form["specific_to_list[0]"] = "fbid:" + threadID;
+        form["specific_to_list[1]"] = "fbid:" + session.userId;
+        form.other_user_fbid = threadID;
+      } else form.thread_fbid = threadID;
+      if (input.replyToMessageID != null) form.replied_to_message_id = String(input.replyToMessageID);
+      if (hasFiles) {
+        const uploaded = await uploadAttachments(message.attachment);
+        const grouped = { image_id: "image_ids", gif_id: "gif_ids", video_id: "video_ids", audio_id: "audio_ids", file_id: "file_ids" };
+        const positions = Object.create(null);
+        for (const item of uploaded) {
+          const key = grouped[item.idKey];
+          const position = positions[key] || 0;
+          form[key + "[" + position + "]"] = item.attachmentID;
+          positions[key] = position + 1;
+        }
+      } else {
+        const shareUrl = new URL(String(message.url));
+        if (!["http:", "https:"].includes(shareUrl.protocol) || shareUrl.username || shareUrl.password) {
+          throw new TypeError("Share URL must be a valid HTTP or HTTPS URL without credentials");
+        }
+        const shared = await webClient.post("https://www.facebook.com/message_share_attachment/fromURI/", {
+          image_height: 960, image_width: 960, uri: shareUrl.toString()
+        });
+        const params = shared?.payload?.share_data?.share_params;
+        if (shared?.payload?.error || typeof params !== "string" || !params) {
+          const error = new Error("Facebook could not prepare the shared URL");
+          error.code = "FCA_ATTACHMENT_SHARE_FAILED";
+          throw error;
+        }
+        form["shareable_attachment[share_type]"] = "100";
+        form["shareable_attachment[share_params]"] = params;
+      }
+      if (Array.isArray(message.mentions)) {
+        message.mentions.forEach((mention, index) => {
+          if (!mention || typeof mention.tag !== "string") throw new TypeError("Mention tags must be strings");
+          const offset = body.indexOf(mention.tag, mention.fromIndex || 0);
+          form["profile_xmd[" + index + "][offset]"] = String(offset);
+          form["profile_xmd[" + index + "][length]"] = String(mention.tag.length);
+          form["profile_xmd[" + index + "][id]"] = String(mention.id ?? 0);
+          form["profile_xmd[" + index + "][type]"] = "p";
+        });
+      }
+      const result = await webClient.post("https://www.facebook.com/messaging/send/", form);
+      const payload = result?.payload;
+      if (!payload || payload.error || !Array.isArray(payload.actions)) {
+        const error = new Error("Facebook rejected the attachment message or returned an invalid response");
+        error.code = payload?.error ? "FCA_FACEBOOK_REQUEST_REJECTED" : "FCA_RESPONSE_SHAPE_INVALID";
+        error.facebookError = payload?.error ?? null;
+        throw error;
+      }
+      const action = payload.actions.find(item => item && (item.message_id || item.thread_fbid)) || payload.actions[0];
+      if (!action || !action.message_id) {
+        const error = new Error("Facebook did not confirm the sent attachment message");
+        error.code = "FCA_RESPONSE_SHAPE_INVALID";
+        throw error;
+      }
+      return {
+        threadID: String(action.thread_fbid || threadID),
+        messageID: String(action.message_id),
+        timestamp: action.timestamp ?? null,
+        attachments: hasFiles ? await Promise.resolve([]) : []
+      };
+    }
+
+    function forwardAttachment(attachmentID, recipients, callback) {
+      const operation = (async () => {
+        const id = String(attachmentID ?? "");
+        if (!/^\d{1,40}$/.test(id)) throw new TypeError("attachmentID must be a numeric Facebook attachment ID");
+        const targets = Array.isArray(recipients) ? recipients : [recipients];
+        if (!targets.length || targets.length > 20) throw new RangeError("Recipient count must be between 1 and 20");
+        const form = { attachment_id: id };
+        const timestamp = Math.floor(Date.now() / 1000);
+        targets.forEach((target, index) => {
+          const recipient = String(target ?? "");
+          if (!/^\d{5,30}$/.test(recipient)) throw new TypeError("Every recipient must be a numeric Facebook ID");
+          form["recipient_map[" + (timestamp + index) + "]"] = recipient;
+        });
+        const result = await webClient.post("https://www.facebook.com/mercury/attachments/forward/", form);
+        if (!result?.payload || result.payload.error) {
+          const error = new Error("Facebook rejected the attachment forward request");
+          error.code = "FCA_FACEBOOK_REQUEST_REJECTED";
+          throw error;
+        }
+        return { success: true, attachmentID: id, recipients: targets.map(String) };
+      })();
+      return callbackResult(operation, callback);
+    }
+
     return Object.freeze({
       ...driver,
       ...threadApi,
@@ -217,7 +373,7 @@ async function createFacebookMqttDriver({
           return detach();
         };
       },
-      getHumanizer: () => humanizer,
+      getHumanizer: () => humanizer,\n      uploadAttachment: uploadAttachments,\n      downloadAttachment(url, options = {}) { return downloadAttachmentFile(url, { ...options, fetchImpl: options.fetchImpl || fetchImpl }); },\n      forwardAttachment,\n      sendMessage(input, options = {}) {\n        const message = typeof input?.message === "string" ? null : input?.message;\n        if (message && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);\n        return driver.sendMessage(input, options);\n      },
       changeGroupImage(image, threadID, callback) {
         const operation = (async () => {
           const file = await readImageInput(image);
