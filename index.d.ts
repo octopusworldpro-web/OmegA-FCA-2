@@ -1,3 +1,5 @@
+import type { EventEmitter } from "node:events";
+
 export type LoginMode = "appstate" | "cookie" | "session";
 export type AuthenticationAttemptState = "idle" | "authenticating" | "challenge_required" | "verifying_challenge" | "authenticated" | "failed" | "closed";
 export interface AuthenticationChallenge { readonly type: string; readonly message: string | null; readonly methods: readonly string[]; }
@@ -540,7 +542,7 @@ export interface MessengerBotClient {
   login(credentials: { mode: "appstate"; appState: Cookie[] } | { mode: "session" }, options?: Record<string, unknown>): Promise<ClientApi>;
   logout(): Promise<void>;
 }
-export interface MessengerBot {
+export interface MessengerBot extends EventEmitter {
   readonly api: ClientApi;
   readonly client: MessengerBotClient;
   readonly commandPrefix: string;
