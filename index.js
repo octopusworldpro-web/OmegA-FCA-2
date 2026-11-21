@@ -35,7 +35,7 @@ const { DEFAULT_GATEWAY_URL, DEFAULT_APP_ID, FACEBOOK_GATEWAY_SUBSCRIPTIONS, enc
 const mqtt311Codec = require("./src/transport/mqtt311Codec");
 const { createMqtt311StreamDecoder } = require("./src/transport/mqtt311StreamDecoder");
 const { createMqttRequestTracker } = require("./src/transport/mqttRequestTracker");
-const { MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest } = require("./src/transport/messengerActions");
+const { MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, createMessengerPinMessageRequest } = require("./src/transport/messengerActions");
 const { DEFAULT_MQTT_URL, DEFAULT_MQTT_APP_ID, DEFAULT_MQTT_TOPICS, createFacebookMqttProtocol } = require("./src/transport/facebookMqttProtocol");
 const { parseMessengerSyncPayload, normalizeMessengerDelta, normalizeMessengerAttachment } = require("./src/transport/facebookMqttEvents");
 const { createMessengerSyncCursorStore } = require("./src/transport/messengerSyncCursorStore");
@@ -60,7 +60,7 @@ module.exports = {
   inspectRealtimeBinaryPayload, DEFAULT_MAX_BINARY_PAYLOAD_BYTES,
   inspectRealtimeSyncEnvelope, DEFAULT_MAX_SYNC_FRAME_BYTES,
   createNativeRealtimeTransport, DEFAULT_CONNECT_TIMEOUT_MS, DEFAULT_CLOSE_TIMEOUT_MS, DEFAULT_PROTOCOL_SETUP_TIMEOUT_MS,
-  DEFAULT_GATEWAY_URL, DEFAULT_APP_ID, FACEBOOK_GATEWAY_SUBSCRIPTIONS, encodeGatewaySubscription, decodeGatewayFrame, createFacebookGatewayProtocol, mqtt311Codec, createMqtt311StreamDecoder, createMqttRequestTracker, MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, DEFAULT_MQTT_URL, DEFAULT_MQTT_APP_ID, DEFAULT_MQTT_TOPICS, createFacebookMqttProtocol, parseMessengerSyncPayload, normalizeMessengerDelta, normalizeMessengerAttachment, createMessengerSyncCursorStore, createFacebookMqttDriver, createFacebookThreadApi, FACEBOOK_THREAD_DOC_IDS,
+  DEFAULT_GATEWAY_URL, DEFAULT_APP_ID, FACEBOOK_GATEWAY_SUBSCRIPTIONS, encodeGatewaySubscription, decodeGatewayFrame, createFacebookGatewayProtocol, mqtt311Codec, createMqtt311StreamDecoder, createMqttRequestTracker, MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, createMessengerPinMessageRequest, DEFAULT_MQTT_URL, DEFAULT_MQTT_APP_ID, DEFAULT_MQTT_TOPICS, createFacebookMqttProtocol, parseMessengerSyncPayload, normalizeMessengerDelta, normalizeMessengerAttachment, createMessengerSyncCursorStore, createFacebookMqttDriver, createFacebookThreadApi, FACEBOOK_THREAD_DOC_IDS,
   MAX_IMAGE_UPLOAD_BYTES, MAX_ATTACHMENT_UPLOAD_BYTES, MAX_ATTACHMENT_DOWNLOAD_BYTES, MAX_ATTACHMENT_COUNT, readImageInput, readAttachmentInput, downloadAttachment, safeDownloadUrl,
   parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDigest,
   version: require("./package.json").version
