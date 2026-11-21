@@ -139,3 +139,8 @@ The current new-method test batch passes 346/346 tests on Node.js 20 and Node.js
 ### Multi-thread broadcast helper (2026-11-21)
 
 `sendBroadcast(message, threadIDs, options?, callback?)` is now available through the native driver and client facade. It validates unique numeric thread IDs, bounds recipient count, delay and parallelism, processes recipients in bounded parallel batches, calls `onEach(error, result, threadID)` per recipient, and returns `{ total, sent, failed, results }` so partial failures are visible. It reuses the native text/attachment send paths rather than inventing a second transport. Unit tests cover partial failures, pacing configuration, validation and callback overloads.
+
+
+### E2EE compatibility update (2026-11-21)
+
+The previously missing `_connectE2EEAndMerge()` compatibility hook now exists as an alias for `connectE2EE()`. The native driver also exposes `sendE2EEMessage`, `sendE2EEAttachment`, `downloadE2EEAttachment`, `isE2EEThread`, and `getE2EEStatus`; E2EE message events are merged into the normal listener. The MIT-licensed one-to-one implementation is ported from `bhhoang/fbapi-unofficial` with its copyright/license notice preserved in `THIRD_PARTY_NOTICES.md`. Persistent identity/prekey/session data is AES-256-GCM encrypted at rest using an explicit 32-byte storage key. This does not implement group Sender Keys/SKDM, Labyrinth backup/restore, E2EE calls or key transparency. Private Meta ICDC/Noise endpoints still require authorized live-account acceptance.
