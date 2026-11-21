@@ -132,6 +132,11 @@ export interface LicenseOptions {
 }
 export interface ClientApi {
   connectE2EE?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  listenE2EE?(callback: (error: Error | null, event?: unknown) => void): () => void;
+  sendE2EEReaction?(threadID: string | number, messageID: string, reaction: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  editE2EEMessage?(threadID: string | number, messageID: string, newText: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  unsendE2EEMessage?(threadID: string | number, messageID: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  sendE2EETyping?(threadID: string | number, isTyping?: boolean, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   _connectE2EEAndMerge?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
   sendE2EEMessage?(threadID: string | number, message: string | { body?: string; attachment?: AttachmentInput }, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   sendE2EEAttachment?(threadID: string | number, attachment: AttachmentInput, caption?: string, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
