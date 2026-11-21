@@ -39,7 +39,7 @@ const { parseMessengerSyncPayload, normalizeMessengerDelta, normalizeMessengerAt
 const { createMessengerSyncCursorStore } = require("./src/transport/messengerSyncCursorStore");
 const { createFacebookMqttDriver } = require("./src/transport/facebookMqttDriver");
 const { createFacebookThreadApi, DOC_IDS: FACEBOOK_THREAD_DOC_IDS } = require("./src/transport/facebookThreadApi");
-const { parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDigest } = require("./src/update/manifest");
+const { parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDigest } = require("./src/update/manifest");\nconst { MAX_IMAGE_UPLOAD_BYTES, MAX_ATTACHMENT_UPLOAD_BYTES, MAX_ATTACHMENT_DOWNLOAD_BYTES, MAX_ATTACHMENT_COUNT, readImageInput, readAttachmentInput, downloadAttachment, safeDownloadUrl } = require("./src/compat/imageUpload");
 
 module.exports = {
   normalizeCookies, validateSessionCookies, parseCookieHeader, parseNetscapeCookies,
@@ -58,6 +58,6 @@ module.exports = {
   inspectRealtimeSyncEnvelope, DEFAULT_MAX_SYNC_FRAME_BYTES,
   createNativeRealtimeTransport, DEFAULT_CONNECT_TIMEOUT_MS, DEFAULT_CLOSE_TIMEOUT_MS, DEFAULT_PROTOCOL_SETUP_TIMEOUT_MS,
   DEFAULT_GATEWAY_URL, DEFAULT_APP_ID, FACEBOOK_GATEWAY_SUBSCRIPTIONS, encodeGatewaySubscription, decodeGatewayFrame, createFacebookGatewayProtocol, mqtt311Codec, createMqtt311StreamDecoder, createMqttRequestTracker, MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, DEFAULT_MQTT_URL, DEFAULT_MQTT_APP_ID, DEFAULT_MQTT_TOPICS, createFacebookMqttProtocol, parseMessengerSyncPayload, normalizeMessengerDelta, normalizeMessengerAttachment, createMessengerSyncCursorStore, createFacebookMqttDriver, createFacebookThreadApi, FACEBOOK_THREAD_DOC_IDS,
-  parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDigest,
+  MAX_IMAGE_UPLOAD_BYTES, MAX_ATTACHMENT_UPLOAD_BYTES, MAX_ATTACHMENT_DOWNLOAD_BYTES, MAX_ATTACHMENT_COUNT, readImageInput, readAttachmentInput, downloadAttachment, safeDownloadUrl,\n  parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDigest,
   version: require("./package.json").version
 };
