@@ -61,6 +61,11 @@ function createSessionGuard({ filePath, key, getSession, backupPath, onRecovery 
     }
   }
 
+  function restoreBackup() {
+    assertOpen();
+    return loadSession(backup, key);
+  }
+
   function start(intervalMs = 60_000) {
     assertOpen();
     if (!Number.isInteger(intervalMs) || intervalMs < 1_000) {
@@ -89,7 +94,7 @@ function createSessionGuard({ filePath, key, getSession, backupPath, onRecovery 
     closed = true;
   }
 
-  return Object.freeze({ saveNow, load, start, stop, close, getPaths: () => Object.freeze({ filePath: target, backupPath: backup }) });
+  return Object.freeze({ saveNow, load, restoreBackup, start, stop, close, getPaths: () => Object.freeze({ filePath: target, backupPath: backup }) });
 }
 
 module.exports = { createSessionGuard };

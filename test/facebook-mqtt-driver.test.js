@@ -16,7 +16,7 @@ const appState = [
 ];
 
 function htmlResponse() {
-  const html = '<html><script>{"USER_ID":"123456789012345"}</script></html>';
+  const html = '<html><input type="hidden" name="fb_dtsg" value="fresh-token"><script>{"USER_ID":"123456789012345"}</script></html>';
   return {
     status: 200, ok: true,
     headers: { get: name => name.toLowerCase() === "content-length" ? String(Buffer.byteLength(html)) : name.toLowerCase() === "content-type" ? "text/html" : null, getSetCookie: () => [] },
@@ -403,3 +403,38 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
     await driver.disconnect();
   }
 });
+
+test("native driver exposes encrypted saveSession and account-bound restoreSessionBackup", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-backup-"));
+  const filePath = path.join(directory, "session.enc");
+  const backupPath = filePath + ".bak";
+  const key = "f".repeat(64);
+  let driver;
+  try {
+    driver = await createFacebookMqttDriver({
+      appState, fetchImpl: async () => htmlResponse(),
+      socketFactory: () => new FakeWebSocket(), mqtt: { keepAlive: 0 },
+      sessionGuard: { filePath, key, intervalMs: 60_000 }
+    });
+    await driver.saveSession();
+    const store = require("../src/security/sessionStore");
+    store.saveSession(backupPath, {
+      version: 1, userId: "123456789012345",
+      appState: [
+        { key: "c_user", value: "123456789012345", domain: ".facebook.com", path: "/", secure: true, httpOnly: true },
+        { key: "xs", value: "backup-session", domain: ".facebook.com", path: "/", secure: true, httpOnly: true }
+      ],
+      savedAt: Date.now()
+    }, key);
+    const restored = await driver.restoreSessionBackup();
+    assert.equal(restored.restored, true);
+    assert.equal(restored.userId, "123456789012345");
+    assert.match(driver.getCookies(), /xs=backup-session/);
+    const saved = store.loadSession(filePath, key);
+    assert.equal(saved.appState.find(cookie => cookie.key === "xs").value, "backup-session");
+  } finally {
+    if (driver) await driver.disconnect();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+

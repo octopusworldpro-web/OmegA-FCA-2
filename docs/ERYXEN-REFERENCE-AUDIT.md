@@ -178,3 +178,10 @@ These additions are source-level implementations and deterministic tests; Facebo
 - `api.logout(callback?)` is exposed on the returned FCA API.
 - `api.createGroup(title, participantIDs, callback?)` adapts the documented EryXen argument order to the native `createNewGroup(participantIDs, title, callback?)`.
 - `api.e2ee` namespace now exposes only the implemented connect/disconnect/status/thread/message/media operations. It does not claim E2EE edit, reaction or unsend support unless those methods are separately added.
+
+
+### Encrypted session compatibility update
+
+- `saveSession()` now writes the active AppState to the encrypted SessionGuard snapshot.
+- `restoreSessionBackup()` reads the encrypted backup, verifies the stored account ID, applies the restored cookies to the active session, refreshes Facebook web tokens, and re-saves the restored session. A failed refresh rolls the active cookie jar back.
+- Session backup restore never writes to GoatBot's plaintext `account.txt`; the encrypted sidecar and its backup remain separate.

@@ -243,3 +243,22 @@ test("personal session refreshes fb_dtsg and returns only non-secret token metad
   assert.equal(JSON.stringify(result).includes("new-token"), false);
   session.close();
 });
+
+test("personal session restores an account-bound AppState and rolls back a mismatched identity", async () => {
+  const html = '<html><input type="hidden" name="fb_dtsg" value="fresh-token"></html>';
+  const session = await createPersonalSession({ appState, fetchImpl: async () => response({ html }) });
+  const replacement = [
+    ...appState,
+    { key: "sid", value: "restored-session", domain: ".facebook.com", path: "/", secure: true }
+  ];
+  const result = await session.replaceAppState(replacement);
+  assert.equal(result.userId, "123456789012345");
+  assert.match(session.getCookieHeader(), /sid=restored-session/);
+  await assert.rejects(session.replaceAppState([
+    { key: "c_user", value: "999999999999999", domain: ".facebook.com", path: "/" },
+    { key: "xs", value: "other-account", domain: ".facebook.com", path: "/" }
+  ]), error => error.code === "FCA_SESSION_IDENTITY_MISMATCH");
+  assert.match(session.getCookieHeader(), /sid=restored-session/);
+  session.close();
+});
+

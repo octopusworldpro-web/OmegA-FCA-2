@@ -409,6 +409,27 @@ async function createPersonalSession({
           options.signal?.removeEventListener("abort", onAbort);
         }
       },
+      async replaceAppState(nextAppState) {
+        if (closed) throw new Error("Facebook session is closed");
+        const normalized = validateSessionCookies(nextAppState);
+        const nextUserId = normalized.find(cookie => cookie.key === "c_user")?.value;
+        if (!nextUserId || String(nextUserId) !== String(userId)) {
+          throw sessionError("Restored AppState belongs to a different Facebook account", "FCA_SESSION_IDENTITY_MISMATCH", "error");
+        }
+        const previousCookies = jar.cookies.map(cookie => ({ ...cookie }));
+        const previousTokens = { ...pageTokens };
+        jar.clear();
+        jar.setCookies(normalized);
+        try {
+          await refreshTokens();
+          return Object.freeze({ userId, cookieCount: jar.cookies.length });
+        } catch (error) {
+          jar.clear();
+          jar.setCookies(previousCookies);
+          pageTokens = previousTokens;
+          throw error;
+        }
+      },
       getAppState() {
         if (closed) throw new Error("Facebook session is closed");
         return jar.cookies.map(cookie => ({ ...cookie }));

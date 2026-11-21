@@ -61,3 +61,22 @@ test("SessionGuard requires explicit paths, key validation and a safe interval",
   try { assert.throws(() => guard.start(999), /at least 1000/); }
   finally { guard.close(); }
 });
+
+test("SessionGuard can read its encrypted backup without replacing the primary", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-session-backup-"));
+  const filePath = path.join(directory, "session.enc");
+  const key = "e".repeat(64);
+  let savedAt = 1;
+  const guard = createSessionGuard({ filePath, key, getSession: () => ({ userId: "123456789", savedAt }) });
+  try {
+    await guard.saveNow();
+    savedAt = 2;
+    await guard.saveNow();
+    assert.equal(guard.restoreBackup().savedAt, 1);
+    assert.equal(guard.load().savedAt, 2);
+  } finally {
+    guard.close();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+

@@ -194,7 +194,7 @@ A small command/keyword bot wrapper is available when you want a higher-level ev
 
 ```js
 const bot = await createMessengerBot(
-  { appState: require("./account.txt") },
+  { appState: JSON.parse(require("node:fs").readFileSync("./account.txt", "utf8")) },
   { commandPrefix: "/" }
 );
 
