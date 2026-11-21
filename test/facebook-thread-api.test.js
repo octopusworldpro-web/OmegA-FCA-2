@@ -616,7 +616,8 @@ test("sharePost sends a validated Comet reshare mutation and normalizes its resu
   const variables = JSON.parse(captured.body.variables);
   assert.equal(variables.input.story_id, Buffer.from("S:_I123456789012345:post.123").toString("base64"));
   assert.deepEqual(variables.input.message, { text: "Sharing this" });
-  await assert.rejects(api.sharePost("post.123"), error =>
+  const malformedApi = createFacebookThreadApi({ session, webClient: { post: async () => ({ payload: { data: {} } }) } });
+  await assert.rejects(malformedApi.sharePost("post.123"), error =>
     error.code === "FCA_RESPONSE_SHAPE_INVALID" && error.retryable === false);
   assert.throws(() => api.sharePost(""), /postID/);
   assert.throws(() => api.sharePost("post.123", 42), /message must be a string/);
