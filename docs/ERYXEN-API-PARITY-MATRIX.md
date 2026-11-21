@@ -25,9 +25,9 @@ The definite public-README gaps found in this source audit are:
 3. `followUser` and `unfollowUser`
 4. `postComment` and `sharePost`
 5. `uploadImageToImgbb`
-6. `listenE2EE` as a distinct listener API
+6. `listenE2EE` as a distinct listener API (implemented in Step 8)
 
-The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/disconnect/status/thread detection, text/media send and attachment download, but does not expose the full reference E2EE method set (reaction, typing, unsend, edit, mark-read and combined E2EE listener/media-event parity).
+The E2EE namespace now exposes a distinct E2EE-only listener plus one-to-one reaction, typing, unsend and edit controls. E2EE mark-read, group Sender Keys, encrypted group media and Labyrinth backup/restore remain unsupported or partial.
 
 ## Method-level matrix
 
@@ -111,14 +111,14 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 | Reference E2EE capability | OmegA-FCA status |
 |---|---|
 | Automatic E2EE connection after login | Partial / not claimed as reference-equivalent |
-| `listenE2EE` combined event listener | **Missing** as a distinct public method |
+| `listenE2EE` E2EE-only listener | Implemented; synthetic API coverage; live-unverified |
 | `e2ee.isConnected()`, status, thread detection | Implemented |
 | `e2ee.sendMessage()` | Implemented for the supported native client path; live-unverified |
 | `e2ee.sendAttachment()` / download | Implemented; live-unverified |
-| `e2ee.sendReaction()` | **Missing** |
-| `e2ee.sendTyping()` | **Missing** |
-| `e2ee.unsendMessage()` | **Missing** |
-| `e2ee.editMessage()` | **Missing** |
+| `e2ee.sendReaction()` | Implemented for verified one-to-one threads; synthetic payload tests; live-unverified |
+| `e2ee.sendTyping()` | Implemented for verified one-to-one threads; synthetic frame tests; live-unverified |
+| `e2ee.unsendMessage()` | Implemented for verified one-to-one threads; synthetic payload tests; live-unverified |
+| `e2ee.editMessage()` | Implemented for verified one-to-one threads; synthetic payload tests; live-unverified |
 | E2EE mark-read | **Missing** |
 | Encrypted group threads / group Sender Keys | Not implemented / explicitly out of scope for current engine |
 | Incoming E2EE media and quoted-reply media parity | Partial; must not be assumed from regular MQTT attachment normalization |
@@ -165,3 +165,13 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 - `editMessage`, `unsendMessage`, `markAsRead`, `markAsReadAll`, `markAsSeen`, and `markAsDelivered` have implementation and synthetic contract coverage. Read-receipt event normalization preserves metadata watermark timestamps.
 - Concurrent MQTT request failures are isolated, request capacity is checked before publishing, and request-ID wraparound avoids IDs still pending.
 - All listed Facebook-specific wire behavior remains live-unverified; this checkpoint does not claim full FCA parity or production acceptance.
+
+
+## Step 8 E2EE implementation checkpoint (2026-11-21)
+
+- Added dedicated `listenE2EE` subscription and `api.e2ee.listen()` without requiring consumers to subscribe to regular MQTT events.
+- Added E2EE one-to-one reaction, edit, revoke/unsend and composing/paused typing operations. All are guarded by a verified one-to-one thread lookup; group Sender Keys are not silently attempted.
+- Added API facade wiring, TypeScript declarations, usage documentation and synthetic payload/frame tests.
+- E2EE key agreement, signed-prekey verification, media encryption/HMAC integrity, encrypted device-store persistence and Facebook-host cookie isolation remain covered by the existing suite.
+- E2EE mark-read, group Sender Keys/group media, encrypted backup restore and key transparency remain unsupported; do not claim complete Messenger E2EE.
+- All Meta private endpoint, Noise handshake and real-account send/receive behavior remains live-unverified pending authorized Facebook acceptance.
