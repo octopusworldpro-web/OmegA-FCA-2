@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const os = require("node:os");
 const { createPersonalSession } = require("../auth/personalSession");
 const { createSessionGuard } = require("../security/sessionGuard");
 const { createFacebookMqttProtocol } = require("./facebookMqttProtocol");
@@ -11,6 +12,8 @@ const { readImageInput, readAttachmentInput, downloadAttachment: downloadAttachm
 const { offlineThreadingId, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
 const { createHumanizer } = require("../compat/humanizer");
 const { createBroadcastSender } = require("../compat/broadcast");
+const { E2EEClient } = require("../e2ee/client");
+const { createE2EEHttpAdapter } = require("../e2ee/httpAdapter");
 
 /**
  * Builds an owner-authorized personal Messenger MQTT driver.
@@ -154,6 +157,102 @@ async function createFacebookMqttDriver({
       guard.start(sessionGuardOptions.intervalMs === undefined ? 60_000 : sessionGuardOptions.intervalMs);
     }
     const threadApi = createFacebookThreadApi({ session, clientId: protocolConfig.session.clientId, webClient });
+    let e2eeClient = null;
+    const e2eeListeners = new Set();
+    const e2eeStorageKey = loginOptions.e2eeStorageKey ?? sessionGuardOptions?.key ?? null;
+    if (e2eeStorageKey != null) {
+      if (typeof e2eeStorageKey === "string" ? !/^[a-f0-9]{64}$/i.test(e2eeStorageKey)
+        : (!(Buffer.isBuffer(e2eeStorageKey) || e2eeStorageKey instanceof Uint8Array) || e2eeStorageKey.byteLength !== 32)) {
+        throw new TypeError("e2eeStorageKey must be 32 bytes or exactly 64 hexadecimal characters");
+      }
+    }
+    const e2eeDevicePath = loginOptions.e2eeDevicePath
+      ? path.resolve(loginOptions.e2eeDevicePath)
+      : e2eeStorageKey
+        ? path.join(os.homedir(), ".omega-fca", "e2ee", session.userId + ".json")
+        : "";
+    if (loginOptions.e2eeDevicePath && !e2eeStorageKey) {
+      const error = new Error("Persistent E2EE device storage requires e2eeStorageKey (32 bytes or 64 hex characters)");
+      error.code = "FCA_E2EE_STORAGE_KEY_REQUIRED";
+      throw error;
+    }
+    function dispatchE2EEEvent(error, event) {
+      if (event && typeof event === "object") {
+        event.isE2EE = true;
+        event.isEncrypted = true;
+      }
+      for (const listener of e2eeListeners) {
+        try { listener(error || null, event); } catch {}
+      }
+    }
+    function getE2EEClient() {
+      if (e2eeClient) return e2eeClient;
+      const tokens = session.getTokens();
+      const ctx = {
+        userID: session.userId,
+        fb_dtsg: tokens.fbDtsg,
+        ttstamp: tokens.jazoest,
+        lsd: tokens.lsd,
+        clientRevision: tokens.spinR,
+        jar: {
+          getCookies(url) {
+            const header = session.getCookieHeader(url);
+            return header ? header.split(/;\\s*/).filter(Boolean) : [];
+          }
+        },
+        globalOptions: {
+          ...runtimeOptions,
+          e2eeDevicePath,
+          e2eeStorageKey,
+          e2eeDeviceListCacheMs: loginOptions.e2eeDeviceListCacheMs,
+          e2eeFrameLog: loginOptions.e2eeFrameLog
+        },
+        globalCallback: dispatchE2EEEvent
+      };
+      const defaultFuncs = {
+        async post(url, _jar, form) {
+          const response = await webClient.post(url, form);
+          return response.payload;
+        }
+      };
+      const httpAdapter = createE2EEHttpAdapter({ session, fetchImpl, userAgent: effectiveUserAgent });
+      e2eeClient = new E2EEClient(ctx, defaultFuncs, { httpRequest: httpAdapter.request });
+      return e2eeClient;
+    }
+    async function connectE2EE() {
+      return getE2EEClient().connect();
+    }
+    function callE2EE(method, args) {
+      return new Promise((resolve, reject) => {
+        getE2EEClient()[method](...args, (error, result) => error ? reject(error) : resolve(result));
+      });
+    }
+    async function sendE2EEMessage(threadID, message, options = {}) {
+      const value = typeof message === "string" ? { body: message } : message;
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new TypeError("E2EE message must be a string or message object");
+      }
+      if (value.url != null) throw new TypeError("E2EE URL-share messages are not supported; send a text message or encrypted attachment");
+      const reply = options.replyToMessageID != null
+        ? { quotedId: String(options.replyToMessageID) }
+        : null;
+      if (value.attachment != null) {
+        const file = await readAttachmentInput(value.attachment);
+        const mime = file.mimeType.toLowerCase();
+        const kind = mime === "image/gif" ? "gif" : mime.startsWith("image/") ? "image" :
+          mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "document";
+        const serverMediaType = kind === "document" ? "document" : kind;
+        return callE2EE("sendAttachment", [String(threadID), {
+          buffer: file.buffer, kind, serverMediaType, mimetype: file.mimeType,
+          filename: file.fileName, caption: String(value.body || "")
+        }, reply]);
+      }
+      return callE2EE("sendText", [String(threadID), String(value.body || ""), reply]);
+    }
+    async function downloadE2EEAttachment(attachment) {
+      return callE2EE("downloadMedia", [attachment]);
+    }
+
     const stopSessionGuard = async () => {
       if (!guard) return false;
       const active = guard;
