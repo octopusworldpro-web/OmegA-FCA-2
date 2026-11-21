@@ -92,7 +92,7 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 | `reactToPost` | Implemented; live-unverified | Adapter over post-reaction action exists. |
 | `reactToComment` | Implemented; live-unverified | Adapter over post-reaction action exists; comment reaction semantics need live confirmation. |
 | `postComment` | Implemented; live-unverified | Authenticated Comet comment mutation for text comments and optional comment replies; rich attachment/mention parity is not claimed. |
-| `sharePost` | **Missing** | No matching first-party action found. |
+| `sharePost` | Implemented; live-unverified | Comet feed-to-feed reshare mutation; accepts an optional text message and normalizes the returned shared story ID. |
 | `getCurrentUserID` | Implemented | Native authenticated session identity exists. |
 | `getAppState` | Implemented | Native session cookie/AppState export exists. |
 | `setOptions` | Partial | Supported listener/runtime flags are validated; not every Eryxen option is implemented. |
