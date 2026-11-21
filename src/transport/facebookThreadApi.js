@@ -33,6 +33,10 @@ const POLL_URL = "https://www.facebook.com/messaging/group_polling/create_poll/?
 const REQUEST_URL = "https://www.facebook.com/ajax/mercury/move_thread.php";
 const SEARCH_THREAD_URL = "https://www.facebook.com/ajax/mercury/search_threads.php";
 const THREAD_PICTURES_URL = "https://www.facebook.com/ajax/messaging/attachments/sharedphotos.php";
+const BLOCK_URL = "https://www.facebook.com/messaging/block_messages/";
+const UNBLOCK_URL = "https://www.facebook.com/messaging/unblock_messages/";
+const BIO_URL = "https://www.facebook.com/api/graphql/";
+const UNFRIEND_URL = "https://www.facebook.com/ajax/profile/removefriendconfirm.php";
 
 // Public FCA document IDs. Facebook changes private web query IDs without notice.
 const DOC_IDS = Object.freeze({
@@ -634,6 +638,74 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function changeBlockedStatus(userID, block, callback) {
+    const user = id(userID, "userID");
+    if (typeof block !== "boolean") throw new TypeError("block must be a boolean");
+    const endpoint = block ? BLOCK_URL : UNBLOCK_URL;
+    const operation = web.post(endpoint, { fbid: user }).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("changeBlockedStatus: Facebook rejected the block status update", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function changeBio(bio, publish, callback) {
+    let publishStory = publish;
+    let done = callback;
+    if (typeof publishStory === "function") { done = publishStory; publishStory = false; }
+    if (publishStory === undefined) publishStory = false;
+    if (typeof bio !== "string" || bio.length > 101) throw new TypeError("bio must be a string up to 101 characters");
+    if (typeof publishStory !== "boolean") throw new TypeError("publish must be a boolean");
+    const form = {
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "ProfileCometSetBioMutation",
+      doc_id: "2725043627607610",
+      variables: JSON.stringify({
+        input: {
+          bio, publish_bio_feed_story: publishStory, actor_id: session.userId,
+          client_mutation_id: String(randomInt(0, 1025))
+        },
+        hasProfileTileViewID: false, profileTileViewID: null, scale: 1
+      }),
+      av: session.userId
+    };
+    const operation = web.post(BIO_URL, form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("changeBio: Facebook rejected the profile bio update", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, done);
+  }
+
+  function unfriend(userID, callback) {
+    const user = id(userID, "userID");
+    const form = {
+      uid: user, unref: "bd_friends_tab", floc: "friends_tab",
+      "nctr[_mod]": "pagelet_timeline_app_collection_" + session.userId + ":2356318349:2"
+    };
+    const operation = web.post(UNFRIEND_URL, form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("unfriend: Facebook rejected the friend removal", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function getEmojiUrl(character, size = 64, pixelRatio = "1.0") {
+    if (typeof character !== "string" || !character || Array.from(character).length !== 1) throw new TypeError("character must be one emoji character");
+    if (![32, 64, 128].includes(size)) throw new TypeError("size must be 32, 64, or 128");
+    if (!["1.0", "1.5"].includes(String(pixelRatio))) throw new TypeError("pixelRatio must be 1.0 or 1.5");
+    const ending = String(pixelRatio) + "/" + size + "/" + character.codePointAt(0).toString(16) + ".png";
+    let hash = 317426846;
+    for (let index = 0; index < ending.length; index++) hash = (Math.imul(hash, 31) + ending.charCodeAt(index)) | 0;
+    const shard = (hash & 255).toString(16);
+    return "https://static.xx.fbcdn.net/images/emoji.php/v8/z" + shard + "/" + ending;
+  }
+
   function changeAdminStatus(threadID, adminIDs, adminStatus, callback) {
     const thread = id(threadID, "threadID");
     if (typeof adminStatus !== "boolean") throw new TypeError("adminStatus must be a boolean");
@@ -858,7 +930,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
   }
 
   return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
-    addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
+    addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeBlockedStatus, changeBio, unfriend, getEmojiUrl, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
 module.exports = { createFacebookThreadApi, DOC_IDS };
