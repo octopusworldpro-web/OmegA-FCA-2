@@ -54,3 +54,32 @@ test("rejects malformed request input and bounds pending requests", async () => 
   config.protocol.closeRequests(new Error("test cleanup"));
   await assert.rejects(pending, /test cleanup/);
 });
+
+
+test("rejects one failed publish without disturbing other pending requests", async () => {
+  const tracker = createMqttRequestTracker({ timeoutMs: 1000 });
+  const first = tracker.track(1);
+  const second = tracker.track(2);
+  const failure = Object.assign(new Error("socket send failed"), { code: "SEND_FAILED" });
+  assert.equal(tracker.reject(1, failure), true);
+  await assert.rejects(first, error => error.code === "SEND_FAILED");
+  assert.equal(tracker.pendingCount, 1);
+  assert.equal(tracker.resolve({ request_id: 2, payload: { delivered: true } }), true);
+  assert.deepEqual(await second, { request_id: 2, payload: { delivered: true } });
+  assert.equal(tracker.pendingCount, 0);
+  assert.equal(tracker.reject(2, failure), false);
+});
+
+test("request ID allocation skips IDs still pending after numeric wrap", async () => {
+  const tracker = createMqttRequestTracker({ initialRequestId: Number.MAX_SAFE_INTEGER - 1 });
+  const maxId = tracker.allocateId();
+  assert.equal(maxId, Number.MAX_SAFE_INTEGER);
+  const maxPending = tracker.track(maxId);
+  const wrapped = tracker.allocateId();
+  assert.equal(wrapped, 1);
+  const onePending = tracker.track(1);
+  assert.equal(tracker.allocateId(), 2);
+  tracker.rejectAll(new Error("cleanup"));
+  await assert.rejects(maxPending, /cleanup/);
+  await assert.rejects(onePending, /cleanup/);
+});
