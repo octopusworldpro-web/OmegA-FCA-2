@@ -114,7 +114,7 @@ The following previously missing flat FCA methods have now been implemented in t
 |---|---|---|
 | `markAsReadAll(callback?)` | `POST /ajax/mercury/mark_folder_as_read.php`, `folder=inbox` | Marks the inbox folder read |
 | `markAsSeen(timestamp?, callback?)` | `POST /ajax/mercury/mark_seen.php`, `seen_timestamp` | Updates the account's seen watermark |
-| `deleteMessage(messageID, callback?)` | `POST /ajax/mercury/delete_messages.php`, `message_ids[0]` | Deletes the message from this account's view; distinct from unsend |
+| `deleteMessage(messageIDs, callback?)` | `POST /ajax/mercury/delete_messages.php`, `client=mercury`, indexed `message_ids[n]` | Deletes one or more messages from this account's view; distinct from unsend |
 | `deleteThread(threadIDs, callback?)` | `POST /ajax/mercury/delete_thread.php`, `client=mercury`, indexed `ids[n]` | Removes one or more threads from the inbox |
 | `muteThread(threadID, seconds, callback?)` | `POST /ajax/mercury/change_mute_thread.php`, `thread_fbid`, `mute_settings` | -1 permanent, 0 unmute, positive duration in seconds |
 | `changeArchivedStatus(threadIDs, archive, callback?)` | `POST /ajax/mercury/change_archived_status.php`, `ids[threadID]` | Archives or unarchives one or more threads |
@@ -127,3 +127,10 @@ Still not claimed as complete: deleteMessage/thread mutation endpoints need auth
 ### Additional thread/group actions (2026-11-21)
 
 The native adapter now also implements `changeAdminStatus`, `createPoll`, `handleMessageRequest`, `searchForThread` and `getThreadPictures`. Each has argument validation, Facebook error checks, callback/Promise compatibility, TypeScript declarations, and synthetic regression coverage. The poll endpoint is legacy/private and may change; live acceptance remains required. `getThreadPictures` validates photo IDs returned by Facebook before issuing detail requests.
+
+
+### Account/profile and utility methods (2026-11-21)
+
+The native adapter also now implements `changeBlockedStatus`, `changeBio`, `unfriend` and `getEmojiUrl`. The first three use authenticated Facebook web actions/GraphQL and reject Facebook-declared failures; `getEmojiUrl` computes the Facebook emoji asset URL locally. Their declarations and synthetic regression tests are included. The legacy bio GraphQL document ID and all account mutation endpoints require authorized live-account acceptance before being treated as stable.
+
+The current new-method test batch passes 346/346 tests on Node.js 20 and Node.js 22; syntax checks, package-root export smoke tests and publishable-package checks also pass on both versions (CI run 44867338258).
