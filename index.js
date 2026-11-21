@@ -20,6 +20,7 @@ const { createFacebookWebClient, assertFacebookUrl, toFormBody } = require("./sr
 const { createClient } = require("./src/api/client");
 const { createGoatBotLogin } = require("./src/compat/goatbotLogin");
 const { createFcaClient } = require("./src/compat/namespacedClient");
+const { MessengerBot, createMessengerBot } = require("./src/compat/messengerBot");
 const { createFacebookMqttClient } = require("./src/compat/facebookMqttClient");
 const { createLegacyFcaProvider } = require("./src/compat/legacyFcaTransport");
 const { verifyLicenseToken } = require("./src/license/verify");
@@ -52,7 +53,7 @@ module.exports = {
   parseAccountText, loadAccountConfig, generateTotp,
   normalizeFacebookResponse, stripFacebookJsonPrefix, createFacebookError,
   createFacebookWebClient, assertFacebookUrl, toFormBody, createClient,
-  createGoatBotLogin, createFcaClient, createFacebookMqttClient, createLegacyFcaProvider, verifyLicenseToken, createLicenseProvider,
+  createGoatBotLogin, createFcaClient, MessengerBot, createMessengerBot, createFacebookMqttClient, createLegacyFcaProvider, verifyLicenseToken, createLicenseProvider,
   validateTransportDriver, createTransportFactory, createMetaMessengerTransport,
   normalizeWebhookPayload, verifyWebhookSignature, verifyWebhookChallenge,
   decodeRealtimeFrame, summarizeRealtimeFrame, DEFAULT_MAX_FRAME_BYTES,

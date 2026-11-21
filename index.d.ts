@@ -505,3 +505,23 @@ export function createFcaClient(api: object): Readonly<{
   users: Readonly<Record<string, (...args: any[]) => any>>;
   account: Readonly<Record<string, (...args: any[]) => any>>;
 }>;
+
+export interface MessengerBot {
+  readonly api: ClientApi;
+  readonly client: Client;
+  readonly commandPrefix: string;
+  command(names: string | string[], handler: (context: MessengerBotContext) => unknown | Promise<unknown>): this;
+  hears(pattern: string | RegExp, handler: (context: MessengerBotContext) => unknown | Promise<unknown>): this;
+  launch(options?: { stopOnSignals?: boolean }): this;
+  stop(): Promise<void>;
+  on(event: string, listener: (...args: any[]) => void): this;
+}
+export interface MessengerBotContext {
+  readonly event: unknown; readonly api: ClientApi; readonly threadID: string | number;
+  readonly senderID?: string | number; readonly body: string; readonly message: string;
+  readonly args: readonly string[]; readonly match: RegExpExecArray | string | null;
+  replyAsync(message: string | Record<string, unknown>, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  reply(message: string | Record<string, unknown>, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  send(message: string | Record<string, unknown>, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+}
+export function createMessengerBot(credentials: { appState: Cookie[] } | { mode: "appstate"; appState: Cookie[] } | { mode: "session" }, options?: Record<string, unknown>): Promise<MessengerBot>;
