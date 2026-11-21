@@ -167,3 +167,10 @@ The browser runs locally; it is not remotely visible to ChatGPT. The default rep
 ### Session bootstrap redirect handling
 
 The personal-session bootstrap follows up to five same-site HTTPS redirects on Facebook/Messenger hosts, preserving rotated cookies between hops. Login and checkpoint redirects remain authentication failures, and redirects to unrelated hosts are rejected.
+
+
+## Messenger E2EE (experimental)
+
+The package includes an MIT-licensed, separate Messenger E2EE client for one-to-one encrypted text and media, with a Noise WebSocket transport, device/prekey management, per-device sessions, and encrypted media transfer. Connect with `api.connectE2EE()`, then use `api.sendE2EEMessage()` or `api.sendMessage(input, { e2ee: "required" })`. Persistent device keys are encrypted with AES-256-GCM; configure a 32-byte `e2eeStorageKey` (or reuse the configured SessionGuard key). See [docs/E2EE.md](docs/E2EE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Group Sender Keys/SKDM, encrypted history backup/restore, E2EE calls and key-transparency verification are not implemented. Private Meta endpoint and Noise-handshake live acceptance with an authorized AppState is still required; synthetic tests do not prove live Meta compatibility.
