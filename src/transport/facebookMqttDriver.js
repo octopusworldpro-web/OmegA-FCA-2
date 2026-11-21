@@ -374,7 +374,15 @@ async function createFacebookMqttDriver({
           return detach();
         };
       },
-      getHumanizer: () => humanizer,\n      uploadAttachment: uploadAttachments,\n      downloadAttachment(url, options = {}) { return downloadAttachmentFile(url, { ...options, fetchImpl: options.fetchImpl || fetchImpl }); },\n      forwardAttachment,\n      sendMessage(input, options = {}) {\n        const message = typeof input?.message === "string" ? null : input?.message;\n        if (message && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);\n        return driver.sendMessage(input, options);\n      },
+      getHumanizer: () => humanizer,
+      uploadAttachment: uploadAttachments,
+      downloadAttachment(url, options = {}) { return downloadAttachmentFile(url, { ...options, fetchImpl: options.fetchImpl || fetchImpl }); },
+      forwardAttachment,
+      sendMessage(input, options = {}) {
+        const message = typeof input?.message === "string" ? null : input?.message;
+        if (message && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);
+        return driver.sendMessage(input, options);
+      },
       changeGroupImage(image, threadID, callback) {
         const operation = (async () => {
           const file = await readImageInput(image);
