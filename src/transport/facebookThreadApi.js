@@ -22,6 +22,12 @@ const PHOTO_URL = "https://www.facebook.com/mercury/attachments/photo";
 const FRIENDS_URL = "https://www.facebook.com/chat/user_info_all";
 const GRAPHQL_URL = "https://www.facebook.com/api/graphql/";
 const DELIVERY_URL = "https://www.facebook.com/ajax/mercury/delivery_receipts.php";
+const READ_ALL_URL = "https://www.facebook.com/ajax/mercury/mark_folder_as_read.php";
+const SEEN_URL = "https://www.facebook.com/ajax/mercury/mark_seen.php";
+const DELETE_MESSAGE_URL = "https://www.facebook.com/ajax/mercury/delete_messages.php";
+const DELETE_THREAD_URL = "https://www.facebook.com/ajax/mercury/delete_thread.php";
+const MUTE_THREAD_URL = "https://www.facebook.com/ajax/mercury/change_mute_thread.php";
+const ARCHIVE_THREAD_URL = "https://www.facebook.com/ajax/mercury/change_archived_status.php";
 
 // Public FCA document IDs. Facebook changes private web query IDs without notice.
 const DOC_IDS = Object.freeze({
@@ -623,6 +629,106 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function markAsReadAll(callback) {
+    const operation = web.post(READ_ALL_URL, { folder: "inbox" }).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("markAsReadAll: Facebook rejected the read-all request", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function markAsSeen(timestamp, callback) {
+    let seenTimestamp = timestamp;
+    let done = callback;
+    if (typeof seenTimestamp === "function") { done = seenTimestamp; seenTimestamp = Date.now(); }
+    if (seenTimestamp === undefined || seenTimestamp === null) seenTimestamp = Date.now();
+    const parsed = Number(seenTimestamp);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) throw new TypeError("seen timestamp must be a non-negative integer");
+    const operation = web.post(SEEN_URL, { seen_timestamp: parsed }).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("markAsSeen: Facebook rejected the seen receipt", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, done);
+  }
+
+  function deleteMessage(messageID, callback) {
+    const message = String(messageID ?? "").trim();
+    if (!message || message.length > 256 || /[\\u0000-\\u001f]/.test(message)) {
+      throw new TypeError("messageID is invalid");
+    }
+    const operation = web.post(DELETE_MESSAGE_URL, { "message_ids[0]": message }).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("deleteMessage: Facebook rejected the delete request", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function deleteThread(threadIDs, callback) {
+    const values = Array.isArray(threadIDs) ? threadIDs : [threadIDs];
+    if (!values.length || values.length > 100) throw new RangeError("deleteThread requires 1 to 100 thread IDs");
+    const normalized = values.map(value => id(value, "threadID"));
+    const form = { client: "mercury" };
+    normalized.forEach((value, index) => { form["ids[" + index + "]"] = value; });
+    const operation = web.post(DELETE_THREAD_URL, form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("deleteThread: Facebook rejected the delete request", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function muteThread(threadID, muteSeconds, callback) {
+    const thread = id(threadID, "threadID");
+    const duration = Number(muteSeconds);
+    if (!Number.isInteger(duration) || duration < -1 || duration > 31_536_000) {
+      throw new TypeError("muteSeconds must be -1 (permanent), 0 (unmute), or an integer up to one year");
+    }
+    const operation = web.post(MUTE_THREAD_URL, {
+      thread_fbid: thread, mute_settings: duration
+    }).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("muteThread: Facebook rejected the mute update", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function changeArchivedStatus(threadIDs, archive, callback) {
+    if (typeof archive !== "boolean") throw new TypeError("archive must be a boolean");
+    const values = Array.isArray(threadIDs) ? threadIDs : [threadIDs];
+    if (!values.length || values.length > 100) throw new RangeError("changeArchivedStatus requires 1 to 100 thread IDs");
+    const normalized = values.map(value => id(value, "threadID"));
+    const form = {};
+    normalized.forEach(value => { form["ids[" + value + "]"] = archive; });
+    const operation = web.post(ARCHIVE_THREAD_URL, form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("changeArchivedStatus: Facebook rejected the archive update", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
   function markAsRead(threadID, read = true, callback) {
     if (typeof read === "function") { callback = read; read = true; }
     if (typeof read !== "boolean") throw new TypeError("read must be a boolean");
@@ -641,7 +747,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
   }
 
   return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
-    addUserToGroup, removeUserFromGroup, changeNickname, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsDelivered, unsendMessage, sendTypingIndicator });
+    addUserToGroup, removeUserFromGroup, changeNickname, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
 module.exports = { createFacebookThreadApi, DOC_IDS };
