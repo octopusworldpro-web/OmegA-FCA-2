@@ -48,7 +48,7 @@ The client exposes each method below only when the injected driver provides that
 
 | Method | License feature gate (when licensing enabled) | Current status |
 |---|---|---|
-| `sendMessage` | `messaging` | Experimental native MQTT task builder; broker acceptance and recipient delivery are unverified. |
+| `sendMessage` | `messaging` | Text/sticker/reply via native MQTT; attachment and URL sends via authenticated legacy Messenger upload/send flow. Synthetic upload/send tests exist; live broker/recipient acceptance remains unverified. |
 | `markAsRead` | `messaging` | Native AppState-backed web action with synthetic request/response tests; live endpoint acceptance is unverified. |
 | `unsendMessage` | `messaging` | Native authenticated unsend endpoint with synthetic success/error tests; live acceptance is unverified. |
 | `markAsDelivered` | `messaging` | Native authenticated delivery-receipt endpoint with synthetic tests; live acceptance is unverified. |
@@ -73,12 +73,12 @@ The complete static scan covers all 271 JavaScript files and 28 Eta templates in
 
 Confirmed direct calls include `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `getUID`, `sendMessage`, `editMessage`, `unsendMessage`, `setMessageReaction`, `markAsRead`, `markAsDelivered`, `shareContact`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadColor` and `changeThreadEmoji`.
 
-The scan also found concrete mismatches: the startup auto-sync passes an unsupported `getThreadList` limit/tag shape; one command requests 1,000 history items where FCA-2 caps the call at 100; attachment-bearing `sendMessage` is rejected; reply events lack the legacy `messageReply` object; read receipts are emitted as `read` while GoatBot expects `read_receipt`; and E2EE is not implemented. `changeGroupImage`, `changeAvatar` and `shareContact` now have native code paths, but live Facebook acceptance remains unverified.
+The scan also found remaining mismatches: startup auto-sync passes an unsupported `getThreadList` limit/tag shape; one command requests 1,000 history items where FCA-2 caps the call at 100; some legacy `sendMessage` call sites pass reply IDs in the wrong positional slot; and E2EE is not implemented. Messenger attachment upload/send/download/forward, nested `messageReply`, and `read_receipt` event naming now have source-level implementations. All private Facebook endpoint behavior remains subject to authorized live acceptance.
 
 ## Required work before migration
 
 - Complete live validation of the owner-supplied AppState session; username/password and 2FA login remain deferred, and checkpoint resolution remains manual.
-- Use [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md) as the completed source-level call-site baseline; resolve the listed signature, attachment and event-shape mismatches before claiming drop-in compatibility.
+- Use [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md) as the completed source-level call-site baseline; resolve the remaining thread-list/history and positional-signature mismatches before claiming drop-in compatibility. Attachment and event-shape implementations are documented separately.
 - Add the missing legacy methods and event shapes only when their request contracts and behavior are evidenced; do not return dummy success responses.
 - Validate native MQTT frame decoding, event normalization, readiness, reconnect and deterministic shutdown against an authorized account; synthetic fake-broker coverage is not live acceptance.
 - Run the owner-operated `npm run test:messenger-mqtt` check for live readiness and inbound events; use its explicit opt-in send mode only against a thread the owner controls and verify recipient delivery.
