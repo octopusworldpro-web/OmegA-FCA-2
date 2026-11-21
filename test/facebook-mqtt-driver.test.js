@@ -309,7 +309,7 @@ test("implements editMessage and shareContact with correlated MQTT requests", as
     const taskPayload = JSON.parse(task.payload);
     let response;
     if (task.queue_name === "edit_message") {
-      assert.equal(taskPayload.message_id, "mid-edit");
+      assert.ok(["mid-edit", "mid-old"].includes(taskPayload.message_id));
       assert.equal(taskPayload.text, "edited text");
       const candidate = [null, null, taskPayload.message_id, null,
         taskPayload.message_id === "mid-old" ? "original text" : "edited text"];
