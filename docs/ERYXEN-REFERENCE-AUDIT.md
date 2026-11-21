@@ -144,3 +144,28 @@ The current new-method test batch passes 346/346 tests on Node.js 20 and Node.js
 ### E2EE compatibility update (2026-11-21)
 
 The previously missing `_connectE2EEAndMerge()` compatibility hook now exists as an alias for `connectE2EE()`. The native driver also exposes `sendE2EEMessage`, `sendE2EEAttachment`, `downloadE2EEAttachment`, `isE2EEThread`, and `getE2EEStatus`; E2EE message events are merged into the normal listener. The MIT-licensed one-to-one implementation is ported from `bhhoang/fbapi-unofficial` with its copyright/license notice preserved in `THIRD_PARTY_NOTICES.md`. Persistent identity/prekey/session data is AES-256-GCM encrypted at rest using an explicit 32-byte storage key. This does not implement group Sender Keys/SKDM, Labyrinth backup/restore, E2EE calls or key transparency. Private Meta ICDC/Noise endpoints still require authorized live-account acceptance.
+
+## Primary reference correction — current `@eryxenx/fca` API (2026-11-21)
+
+The primary comparison target for this project is the current public npm package `@eryxenx/fca` (npm latest observed as 1.3.5 on 2026-11-21), not only the older `fca-eryxenx` 4.0.3 quick reference. The npm README is the API checklist; the separate `fca-eryxenx` repository is useful historical source context and must not be mistaken for the current package's complete implementation.
+
+The current public API checklist includes:
+
+- **Message sending:** `sendMessage`, `sendBroadcast`, `sendGif`, `sendLocation`, `sendImage`, `sendVideo`, `sendAudio`, `sendFile`, `shareLink`, `shareContact`.
+- **Message actions:** `editMessage`, `unsendMessage`, `deleteMessage`, `setMessageReaction`, `getMessage`, `forwardAttachment`, `uploadAttachment`, `pinMessage`, `unpinMessage`.
+- **Receipts and typing:** `markAsRead`, `markAsReadAll`, `markAsDelivered`, `markAsSeen`, `sendTypingIndicator`.
+- **Threads/groups:** `getThreadInfo`, `getThreadList`, `getThreadHistory`, `createGroup`, `deleteThread`, `muteThread`, `changeArchivedStatus`, `handleMessageRequest`, `searchForThread`, `getThreadPictures`, `setTitle`, `changeThreadColor`, `changeThreadEmoji`, `changeNickname`, `changeGroupImage`, `changeAdminStatus`, `addUserToGroup`, `removeUserFromGroup`, `createPoll`.
+- **Users/account:** `getUserInfo`, `getUserID`, `getUID`, `getFriendsList`, `getAvatarUser`, `getProfileInfo`, `getPublicData`, `sendFriendRequest`, `handleFriendRequest`, `changeBlockedStatus`, `followUser`, `unfollowUser`, `unfriend`, `getCurrentUserID`, `getAppState`, `setOptions`, `logout`, `refreshFb_dtsg`, `addExternalModule`.
+- **Social/HTTP:** `reactToPost`, `reactToComment`, `postComment`, `sharePost`, `httpGet`, `httpPost`, `httpPostFormData`, `uploadImageToImgbb`.
+- **Higher-level APIs:** `createFcaClient` namespaced facade and `createMessengerBot` high-level bot class.
+- **E2EE:** automatic startup integration and the `api.e2ee` namespace, including connection status and message/media actions.
+
+### Newly implemented in FCA-2 during this audit continuation
+
+- Bounded pagination for `getThreadList` (up to 10,000 results) and `getThreadHistory` (up to 1,000 messages), rather than rejecting legacy requests above one 100-item GraphQL page.
+- Legacy `sendMessage(message, threadID, replyMessageID)` overload now preserves the third-argument reply ID when the callback is omitted; TypeScript declarations updated.
+- Native MQTT task payloads now support Messenger location metadata and large-emoji sizing, based on the documented reference payload shape.
+- Client convenience methods added for `sendImage`, `sendVideo`, `sendAudio`, `sendFile`, `sendGif`, `sendLocation`, and `shareLink`. Local file paths are accepted as bounded attachment inputs; HTTP(S) GIF/image strings and share links use the explicit URL-share path.
+
+These additions are source-level implementations and deterministic tests; Facebook live acceptance remains a separate gate. Remaining methods in the checklist must be implemented or explicitly marked unsupported one at a time. Do not claim complete parity while any item remains missing, experimental, or live-unverified.
+
