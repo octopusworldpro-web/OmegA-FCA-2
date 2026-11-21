@@ -40,6 +40,20 @@ function callbackResult(operation, callback) {
   return undefined;
 }
 
+function assertMessengerAccepted(response, action) {
+  const payload = response?.payload?.payload ?? response?.payload;
+  const facebookError = response?.error ?? payload?.error;
+  const errors = payload?.errors;
+  if (facebookError != null || (Array.isArray(errors) && errors.length > 0)) {
+    const error = new Error("Facebook rejected the Messenger " + action + " request");
+    error.code = "FCA_FACEBOOK_REQUEST_REJECTED";
+    error.retryable = false;
+    error.facebookError = facebookError ?? errors;
+    throw error;
+  }
+  return response;
+}
+
 async function createFacebookMqttDriver({
   appState, socketFactory, fetchImpl, userAgent, timeoutMs = 20000,
   connectTimeoutMs = 15000, closeTimeoutMs = 3000, protocolSetupTimeoutMs = 15000,
@@ -574,7 +588,8 @@ async function createFacebookMqttDriver({
           });
         }
         if (message && typeof message === "object" && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);
-        return driver.sendMessage(input, options);
+        return Promise.resolve(driver.sendMessage(input, options))
+          .then(response => assertMessengerAccepted(response, "send-message"));
       },
       changeGroupImage(image, threadID, callback) {
         const operation = (async () => {
@@ -679,7 +694,10 @@ async function createFacebookMqttDriver({
       shareContact(text, senderID, threadID, callbackOrMessageID, callback) {
         const done = typeof callbackOrMessageID === "function" ? callbackOrMessageID : callback;
         const request = createMessengerShareContactRequest({ text, senderID, threadID });
-        const operation = driver.sendAction({ topic: "/ls_req", payload: request }).then(() => ({ success: true }));
+        const operation = driver.sendRequest(request).then(response => {
+          assertMessengerAccepted(response, "share-contact");
+          return response?.payload?.payload ?? response?.payload ?? response;
+        });
         return callbackResult(operation, done);
       },
       getCurrentUserID: () => session.userId,
