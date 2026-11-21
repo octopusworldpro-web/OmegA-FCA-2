@@ -229,9 +229,16 @@ function createFacebookMqttProtocol(options = {}) {
       async request(socket, payload, requestOptions = {}) {
         if (!socket || typeof socket.send !== "function") throw new TypeError("A connected MQTT socket is required");
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new TypeError("MQTT request payload must be an object");
+        const timeoutMs = requestOptions.timeoutMs ?? options.requestTimeoutMs ?? 15000;
+        if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) {
+          throw new TypeError("request timeout is invalid");
+        }
+        if (requestTracker.pendingCount >= (options.maxPendingRequests ?? 256)) {
+          throw Object.assign(new Error("MQTT pending request limit reached"), { code: "FCA_MQTT_PENDING_LIMIT" });
+        }
         const requestId = requestTracker.allocateId();
         const envelope = { ...payload, request_id: requestId };
-        const responsePromise = requestTracker.track(requestId, requestOptions.timeoutMs ?? options.requestTimeoutMs ?? 15000);
+        const responsePromise = requestTracker.track(requestId, timeoutMs);
         try {
           socket.send(mqtt.encodePublish({ topic: "/ls_req", payload: JSON.stringify(envelope), qos: 1, packetId: nextPacketId() }));
         } catch (error) {
