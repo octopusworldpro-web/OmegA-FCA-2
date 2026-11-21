@@ -159,3 +159,22 @@ test("normalizes participant events and rejects malformed attachment entries saf
   assert.deepEqual(message.attachments.map(item => item.type), ["file"]);
   assert.equal(message.attachments[0].url, "https://cdn.example/a.pdf");
 });
+
+
+test("preserves read-receipt watermark metadata and message identifiers", () => {
+  const result = normalizeMessengerDelta({
+    class: "ReadReceipt",
+    messageMetadata: {
+      actorFbId: "reader-2",
+      messageId: "last-read-message",
+      threadKey: { threadFbId: "group-2" },
+      watermarkTimestamp: 1700000000123
+    }
+  });
+  assert.equal(result.type, "read_receipt");
+  assert.equal(result.reader, "reader-2");
+  assert.equal(result.userID, "reader-2");
+  assert.equal(result.threadID, "group-2");
+  assert.equal(result.messageID, "last-read-message");
+  assert.equal(result.watermarkTimestamp, 1700000000123);
+});
