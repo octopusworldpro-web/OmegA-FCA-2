@@ -32,12 +32,10 @@ function createBroadcastSender({ sendMessage } = {}) {
     if (settings.onEach !== undefined && typeof settings.onEach !== "function") throw new TypeError("onEach must be a function");
     const operation = (async () => {
       const results = new Array(normalized.length);
-      let next = 0;
-      async function worker() {
-        while (true) {
-          const index = next++;
-          if (index >= normalized.length) return;
-          const threadID = normalized[index];
+      for (let offset = 0; offset < normalized.length; offset += parallel) {
+        const batch = normalized.slice(offset, offset + parallel);
+        await Promise.all(batch.map(async (threadID, batchIndex) => {
+          const index = offset + batchIndex;
           try {
             const result = await sendMessage(message, threadID);
             results[index] = { threadID, result, error: null };
@@ -46,12 +44,11 @@ function createBroadcastSender({ sendMessage } = {}) {
             results[index] = { threadID, result: null, error };
             try { settings.onEach?.(error, null, threadID); } catch {}
           }
-          if (delay > 0 && index + parallel < normalized.length) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
+        }));
+        if (delay > 0 && offset + parallel < normalized.length) {
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
-      await Promise.all(Array.from({ length: Math.min(parallel, normalized.length) }, () => worker()));
       const sent = results.filter(item => item && !item.error).map(({ threadID, result }) => ({ threadID, result }));
       const failed = results.filter(item => item && item.error).map(({ threadID, error }) => ({ threadID, error }));
       return { total: normalized.length, sent, failed, results };
