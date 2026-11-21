@@ -596,3 +596,28 @@ test("friend request, follow/unfollow and postComment use validated Comet mutati
   assert.throws(() => api.postComment("", "post.1"), /non-empty string/);
   assert.throws(() => api.followUser("bad"), /numeric Facebook ID/);
 });
+
+test("sharePost sends a validated Comet reshare mutation and normalizes its result", async () => {
+  let captured;
+  const api = createFacebookThreadApi({ session, webClient: { post: async (url, body) => {
+    captured = { url, body };
+    return { payload: { data: { story_share: { story: {
+      id: "shared.story.1", url: "https://facebook.com/story/shared.story.1"
+    } } } } };
+  } } });
+  const result = await api.sharePost("post.123", "Sharing this");
+  assert.deepEqual(result, {
+    success: true, postID: "post.123", shareID: "shared.story.1",
+    url: "https://facebook.com/story/shared.story.1"
+  });
+  assert.equal(captured.url, "https://www.facebook.com/api/graphql/");
+  assert.equal(captured.body.doc_id, "4833173726776940");
+  assert.equal(captured.body.fb_api_req_friendly_name, "CometFeedToFeedReshareMutation");
+  const variables = JSON.parse(captured.body.variables);
+  assert.equal(variables.input.story_id, Buffer.from("S:_I123456789012345:post.123").toString("base64"));
+  assert.deepEqual(variables.input.message, { text: "Sharing this" });
+  await assert.rejects(api.sharePost("post.123"), error =>
+    error.code === "FCA_RESPONSE_SHAPE_INVALID" && error.retryable === false);
+  assert.throws(() => api.sharePost(""), /postID/);
+  assert.throws(() => api.sharePost("post.123", 42), /message must be a string/);
+});
