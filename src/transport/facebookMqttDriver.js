@@ -182,6 +182,12 @@ async function createFacebookMqttDriver({
         event.isEncrypted = true;
       }
       for (const listener of e2eeListeners) {
+        if (event && typeof event === "object") {
+          const senderID = event.senderID == null ? null : String(event.senderID);
+          const isSelf = senderID !== null && senderID === session.userId;
+          if ((event.type === "message" || event.type === "message_reply") && isSelf && !runtimeOptions.selfListen) continue;
+          if (event.type !== "message" && event.type !== "message_reply" && !runtimeOptions.listenEvents) continue;
+        }
         try { listener(error || null, event); } catch {}
       }
     }
@@ -222,9 +228,11 @@ async function createFacebookMqttDriver({
     async function connectE2EE() {
       return getE2EEClient().connect();
     }
-    function callE2EE(method, args) {
+    function callE2EE(method, args, callbackIndex = args.length) {
       return new Promise((resolve, reject) => {
-        getE2EEClient()[method](...args, (error, result) => error ? reject(error) : resolve(result));
+        const values = args.slice();
+        values.splice(callbackIndex, 0, (error, result) => error ? reject(error) : resolve(result));
+        getE2EEClient()[method](...values);
       });
     }
     async function sendE2EEMessage(threadID, message, options = {}) {
@@ -245,9 +253,9 @@ async function createFacebookMqttDriver({
         return callE2EE("sendAttachment", [String(threadID), {
           buffer: file.buffer, kind, serverMediaType, mimetype: file.mimeType,
           filename: file.fileName, caption: String(value.body || "")
-        }, reply]);
+        }, reply], 2);
       }
-      return callE2EE("sendText", [String(threadID), String(value.body || ""), reply]);
+      return callE2EE("sendText", [String(threadID), String(value.body || ""), reply], 2);
     }
     async function downloadE2EEAttachment(attachment) {
       return callE2EE("downloadMedia", [attachment]);
@@ -460,6 +468,7 @@ async function createFacebookMqttDriver({
         if (!humanizer) humanizer = createHumanizer({
           sendTypingIndicator: (threadID, isTyping) => threadApi.sendTypingIndicator(threadID, isTyping)
         });
+        e2eeListeners.add(callback);
         const detach = driver.listen((error, event) => {
           if (error || !event || typeof event !== "object") {
             if (humanizer) humanizer.stop();
@@ -487,6 +496,7 @@ async function createFacebookMqttDriver({
           callback(null, event);
         });
         return () => {
+          e2eeListeners.delete(callback);
           if (humanizer) humanizer.stop();
           return detach();
         };
@@ -495,9 +505,48 @@ async function createFacebookMqttDriver({
       uploadAttachment: uploadAttachments,
       downloadAttachment(url, options = {}) { return downloadAttachmentFile(url, { ...options, fetchImpl: options.fetchImpl || fetchImpl }); },
       forwardAttachment,
+      connectE2EE(callback) { return callbackResult(connectE2EE(), callback); },
+      _connectE2EEAndMerge(callback) { return callbackResult(connectE2EE(), callback); },
+      sendE2EEMessage(threadID, message, options = {}, callback) {
+        let settings = options;
+        let done = callback;
+        if (typeof settings === "function") { done = settings; settings = {}; }
+        return callbackResult(sendE2EEMessage(threadID, message, settings || {}), done);
+      },
+      sendE2EEAttachment(threadID, attachment, caption = "", options = {}, callback) {
+        let settings = options;
+        let done = callback;
+        if (typeof settings === "function") { done = settings; settings = {}; }
+        return callbackResult(sendE2EEMessage(threadID, { body: caption, attachment }, settings || {}), done);
+      },
+      downloadE2EEAttachment(attachment, callback) {
+        return callbackResult(downloadE2EEAttachment(attachment), callback);
+      },
+      isE2EEThread(threadID) {
+        return e2eeClient ? e2eeClient.isKnownE2EEThread(String(threadID)) : false;
+      },
+      getE2EEStatus() {
+        return Object.freeze({
+          connected: Boolean(e2eeClient && e2eeClient.connected),
+          deviceId: e2eeClient && e2eeClient.store ? e2eeClient.store.jidDevice : null,
+          persistentStorage: Boolean(e2eeDevicePath),
+          storageEncrypted: Boolean(e2eeDevicePath && e2eeStorageKey)
+        });
+      },
       sendMessage(input, options = {}) {
-        const message = typeof input?.message === "string" ? null : input?.message;
-        if (message && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);
+        const message = typeof input?.message === "string" ? input.message : input?.message;
+        const threadID = String(input?.threadID ?? "");
+        const requested = options.e2ee ?? (loginOptions.e2ee === true ? "required" : "auto");
+        const forceE2EE = requested === true || requested === "required";
+        const disableE2EE = requested === false || requested === "disabled";
+        const knownE2EE = !disableE2EE && e2eeClient && e2eeClient.isKnownE2EEThread(threadID);
+        if (forceE2EE || knownE2EE) {
+          return sendE2EEMessage(threadID, message, {
+            ...options,
+            replyToMessageID: input?.replyToMessageID ?? options.replyToMessageID
+          });
+        }
+        if (message && typeof message === "object" && (message.attachment != null || message.url != null)) return sendAttachmentMessage(input);
         return driver.sendMessage(input, options);
       },
       changeGroupImage(image, threadID, callback) {
@@ -660,8 +709,11 @@ async function createFacebookMqttDriver({
         closed = true;
         if (humanizer) humanizer.stop();
         try {
-          try { await stopSessionGuard(); }
-          finally { await transport.disconnect(); }
+          try { if (e2eeClient) e2eeClient.disconnect(); }
+          finally {
+            try { await stopSessionGuard(); }
+            finally { await transport.disconnect(); }
+          }
         } finally { session.close(); }
       }
     });
