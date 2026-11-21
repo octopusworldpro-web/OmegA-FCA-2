@@ -596,6 +596,121 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function sendFriendRequest(userID, callback) {
+    const target = id(userID, "userID");
+    const form = {
+      av: currentUserID,
+      __user: currentUserID,
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "FriendingCometFriendRequestSendMutation",
+      variables: JSON.stringify({
+        input: {
+          click_correlation_id: String(Date.now()),
+          click_proof_validation_result: '{"validated":true}',
+          friend_requestee_ids: [target],
+          friending_channel: "FRIENDS_HOME_MAIN",
+          warn_ack_for_ids: [],
+          actor_id: currentUserID,
+          client_mutation_id: "1"
+        },
+        scale: 1
+      }),
+      server_timestamps: true,
+      doc_id: "24614631718227645"
+    };
+    const operation = web.post(GRAPHQL_URL, form).then(result => {
+      const payload = object(result?.payload);
+      if (payload.errors?.length || payload.error) throw createFacebookError("sendFriendRequest: Facebook rejected the request", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      const requestee = payload.data?.friend_request_send?.friend_requestees?.[0];
+      if (!requestee?.id) throw createFacebookError("sendFriendRequest: response is missing friend request data", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+      return {
+        userID: String(requestee.id),
+        friendshipStatus: requestee.friendship_status ?? null,
+        success: requestee.friendship_status === "OUTGOING_REQUEST",
+        actionTitle: requestee.profile_action?.title?.text ?? ""
+      };
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function setFollowStatus(userID, follow, callback) {
+    const target = id(userID, "userID");
+    if (typeof follow !== "boolean") throw new TypeError("follow must be a boolean");
+    const form = {
+      av: currentUserID,
+      fb_api_req_friendly_name: follow ? "CometUserFollowMutation" : "CometUserUnfollowMutation",
+      fb_api_caller_class: "RelayModern",
+      doc_id: "25472099855769847",
+      variables: JSON.stringify({
+        ...(follow ? {} : { action_render_location: "WWW_COMET_FRIEND_MENU" }),
+        input: {
+          attribution_id_v2: "ProfileCometTimelineListViewRoot.react,comet.profile.timeline.list,via_cold_start",
+          is_tracking_encrypted: true,
+          subscribe_location: "PROFILE",
+          subscribee_id: target,
+          tracking: null,
+          actor_id: currentUserID,
+          client_mutation_id: "1"
+        },
+        scale: 1
+      })
+    };
+    const operation = web.post(GRAPHQL_URL, form).then(result => {
+      const payload = object(result?.payload);
+      if (payload.errors?.length || payload.error) throw createFacebookError((follow ? "followUser" : "unfollowUser") + ": Facebook rejected the action", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      return true;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function followUser(userID, callback) { return setFollowStatus(userID, true, callback); }
+  function unfollowUser(userID, callback) { return setFollowStatus(userID, false, callback); }
+
+  function postComment(message, postID, replyCommentID, callback) {
+    if (typeof replyCommentID === "function") { callback = replyCommentID; replyCommentID = null; }
+    if (typeof message !== "string" || !message.trim() || Buffer.byteLength(message, "utf8") > 20000) throw new TypeError("message must be a non-empty string up to 20000 bytes");
+    const post = String(postID ?? "").trim();
+    if (!post || post.length > 256) throw new TypeError("postID is invalid");
+    const reply = replyCommentID == null ? null : String(replyCommentID);
+    if (reply && reply.length > 256) throw new TypeError("replyCommentID is invalid");
+    const guid = () => randomUUID();
+    const variables = {
+      feedLocation: "NEWSFEED",
+      feedbackSource: 1,
+      groupID: null,
+      input: {
+        client_mutation_id: "1",
+        actor_id: currentUserID,
+        attachments: [],
+        feedback_id: Buffer.from("feedback:" + post).toString("base64"),
+        message: { ranges: [], text: message },
+        reply_comment_parent_fbid: reply,
+        is_tracking_encrypted: true,
+        tracking: [],
+        feedback_source: "NEWS_FEED",
+        idempotence_token: "client:" + guid(),
+        session_id: guid()
+      },
+      scale: 1,
+      useDefaultActor: false
+    };
+    const operation = web.post(GRAPHQL_URL, {
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "useCometUFICreateCommentMutation",
+      variables: JSON.stringify(variables),
+      server_timestamps: true,
+      doc_id: "6993516810709754"
+    }).then(result => {
+      const payload = object(result?.payload);
+      if (payload.errors?.length || payload.error) throw createFacebookError("postComment: Facebook rejected the comment", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      const created = payload.data?.comment_create;
+      const edge = created?.feedback_comment_edge;
+      if (!edge?.node?.id) throw createFacebookError("postComment: response is missing comment data", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+      return { id: String(edge.node.id), url: edge.node.feedback?.url ?? null, count: created.feedback?.total_comment_count ?? 0 };
+    });
+    return callbackResult(operation, callback);
+  }
+
   function setTitle(newTitle, threadID, callback) {
     if (typeof newTitle !== "string" || newTitle.length > 100) throw new TypeError("newTitle must be a string up to 100 characters");
     const thread = id(threadID, "threadID");
@@ -1043,7 +1158,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
-  return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
+  return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo, sendFriendRequest, followUser, unfollowUser, postComment,
     addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeBlockedStatus, changeBio, unfriend, getEmojiUrl, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, setPostReaction, reactToPost, reactToComment, handleFriendRequest, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
