@@ -5,7 +5,7 @@
 **OmegA-FCA branch:** `main` (package `0.1.6-rc.3`)  
 **Status:** Full 271-JavaScript-file GoatBot call-site audit completed on 2026-11-21. Native AppState/MQTT integration is wired; live acceptance and complete FCA parity remain unverified. See [complete call-site inventory](GOATBOT-CALLSITE-INVENTORY.md).
 
-This matrix separates what the current OmegA-FCA facade exposes from what still requires a real transport and end-to-end verification. A method appearing in the facade means only that the injected driver supplied it; it does not mean Facebook behavior is implemented by this package.
+This matrix separates what the current OmegA-FCA facade exposes from what still requires a real transport and end-to-end verification. See [Messenger event compatibility](GOATBOT-EVENT-COMPATIBILITY.md) for the normalized legacy event contract. A method appearing in the facade means only that the injected driver supplied it; it does not mean Facebook behavior is implemented by this package.
 
 ## Login and lifecycle
 
