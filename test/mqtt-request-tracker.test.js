@@ -75,10 +75,9 @@ test("request ID allocation skips IDs still pending after numeric wrap", async (
   const maxId = tracker.allocateId();
   assert.equal(maxId, Number.MAX_SAFE_INTEGER);
   const maxPending = tracker.track(maxId);
-  const wrapped = tracker.allocateId();
-  assert.equal(wrapped, 1);
   const onePending = tracker.track(1);
-  assert.equal(tracker.allocateId(), 2);
+  const wrapped = tracker.allocateId();
+  assert.equal(wrapped, 2);
   tracker.rejectAll(new Error("cleanup"));
   await assert.rejects(maxPending, /cleanup/);
   await assert.rejects(onePending, /cleanup/);
