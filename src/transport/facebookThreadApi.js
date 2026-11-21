@@ -167,6 +167,23 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function httpGet(url, query, callback) {
+    if (typeof query === "function") { callback = query; query = {}; }
+    if (query == null) query = {};
+    if (!query || typeof query !== "object" || Array.isArray(query)) {
+      throw new TypeError("httpGet query must be an object");
+    }
+    const operation = web.get(url, { query }).then(result => {
+      if (typeof result.raw !== "string") {
+        throw createFacebookError("httpGet: response body was not available", {
+          code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false
+        });
+      }
+      return result.raw;
+    });
+    return callbackResult(operation, callback);
+  }
+
   function getThreadList(limit, timestamp = null, tags = [], callback) {
     if (typeof tags === "function") { callback = tags; tags = []; }
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new TypeError("getThreadList limit must be an integer from 1 to 100");
@@ -609,7 +626,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
-  return Object.freeze({ httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
+  return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
     addUserToGroup, removeUserFromGroup, changeNickname, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsDelivered, unsendMessage, sendTypingIndicator });
 }
 
