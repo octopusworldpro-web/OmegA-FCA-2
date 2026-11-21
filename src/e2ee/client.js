@@ -1530,6 +1530,63 @@ E2EEClient.prototype.sendText = function(threadId, text, callback, reply) {
     );
 };
 
+E2EEClient.prototype.sendReaction = function(threadId, messageID, reaction, callback) {
+  var self = this;
+  if (typeof reaction !== "string") return callback(new TypeError("E2EE reaction must be a string"));
+  this.connect().then(function() {
+    var key = new proto.ProtoWriter().string(3, String(messageID)).build();
+    var reactionPayload = new proto.ProtoWriter()
+      .bytes(1, key)
+      .string(2, reaction)
+      .uint64(4, BigInt(Date.now()))
+      .build();
+    var content = new proto.ProtoWriter().bytes(16, reactionPayload).build();
+    var consumerApp = new proto.ProtoWriter()
+      .bytes(1, new proto.ProtoWriter().bytes(1, content).build())
+      .build();
+    return self._sendMessageApp(threadId, consumerApp, "text", "", undefined, null);
+  }).then(function(info) { callback(null, info); }, function(error) { callback(error); });
+};
+
+E2EEClient.prototype.editMessage = function(threadId, messageID, newText, callback) {
+  var self = this;
+  if (typeof newText !== "string") return callback(new TypeError("E2EE edited text must be a string"));
+  this.connect().then(function() {
+    var key = new proto.ProtoWriter().string(3, String(messageID)).build();
+    var text = new proto.ProtoWriter().string(1, newText).build();
+    var edit = new proto.ProtoWriter().bytes(1, key).bytes(2, text).uint64(3, BigInt(Date.now())).build();
+    var content = new proto.ProtoWriter().bytes(19, edit).build();
+    var consumerApp = new proto.ProtoWriter()
+      .bytes(1, new proto.ProtoWriter().bytes(1, content).build())
+      .build();
+    return self._sendMessageApp(threadId, consumerApp, "text", newText, undefined, null, { edit: "1" });
+  }).then(function(info) { callback(null, info); }, function(error) { callback(error); });
+};
+
+E2EEClient.prototype.unsendMessage = function(threadId, messageID, callback) {
+  var self = this;
+  this.connect().then(function() {
+    var key = new proto.ProtoWriter().string(3, String(messageID)).build();
+    var revoke = new proto.ProtoWriter().bytes(1, key).build();
+    var applicationData = new proto.ProtoWriter().bytes(1, revoke).build();
+    var payload = new proto.ProtoWriter().bytes(2, applicationData).build();
+    var consumerApp = new proto.ProtoWriter().bytes(1, payload).build();
+    return self._sendMessageApp(threadId, consumerApp, "text", "", undefined, null, { edit: "7" });
+  }).then(function(info) { callback(null, info); }, function(error) { callback(error); });
+};
+
+E2EEClient.prototype.sendTyping = function(threadId, isTyping, callback) {
+  var self = this;
+  this.connect().then(function() {
+    var node = binary.encodeNode("chatstate", {
+      to: normalizeThreadJid(threadId),
+      type: isTyping === false ? "paused" : "composing"
+    });
+    return self.sendNode(node);
+  }).then(function() { callback(null, { threadID: String(threadId), isTyping: isTyping !== false }); },
+    function(error) { callback(error); });
+};
+
 E2EEClient.prototype.sendAttachment = function(threadId, attachment, callback, reply) {
   var self = this;
   if (String(threadId).indexOf("@g.us") !== -1) {
@@ -1573,7 +1630,7 @@ E2EEClient.prototype.sendAttachment = function(threadId, attachment, callback, r
     );
 };
 
-E2EEClient.prototype._sendMessageApp = function(threadId, consumerApp, nodeType, historyBody, protocolMediaType, reply) {
+E2EEClient.prototype._sendMessageApp = function(threadId, consumerApp, nodeType, historyBody, protocolMediaType, reply, extraMessageAttrs) {
   var self = this;
   var store = this.store;
   var toJid = normalizeThreadJid(threadId);
@@ -1661,7 +1718,7 @@ E2EEClient.prototype._sendMessageApp = function(threadId, consumerApp, nodeType,
       });
       var messageNode = binary.encodeNode(
         "message",
-        { to: toJid, type: nodeType || "text", id: messageId },
+        Object.assign({ to: toJid, type: nodeType || "text", id: messageId }, extraMessageAttrs || {}),
         [
           binary.encodeNode("participants", {}, participantNodes),
           binary.encodeNode("franking", {}, [binary.encodeNode("franking_tag", {}, app.frankingTag)]),
