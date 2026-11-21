@@ -38,8 +38,9 @@ function randomUUID() {
   );
 }
 
-function DeviceStore(filePath) {
+function DeviceStore(filePath, encryptionKey) {
   this.path = filePath || "";
+  this.encryptionKey = normalizeStorageKey(encryptionKey);
   this.noiseKeyPriv = null;
   this.identityKeyPair = null;
   this.signedPreKey = null;
@@ -145,6 +146,11 @@ DeviceStore.prototype.identityPublic = function() {
 
 DeviceStore.prototype.save = function() {
   if (!this.path) return;
+  if (!this.encryptionKey) {
+    var keyError = new Error("Persistent E2EE storage requires an explicit 32-byte e2eeStorageKey");
+    keyError.code = "FCA_E2EE_STORAGE_KEY_REQUIRED";
+    throw keyError;
+  }
   var dir = path.dirname(this.path);
   try {
     fs.mkdirSync(dir, { recursive: true });
