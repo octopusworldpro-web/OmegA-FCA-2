@@ -28,6 +28,11 @@ const DELETE_MESSAGE_URL = "https://www.facebook.com/ajax/mercury/delete_message
 const DELETE_THREAD_URL = "https://www.facebook.com/ajax/mercury/delete_thread.php";
 const MUTE_THREAD_URL = "https://www.facebook.com/ajax/mercury/change_mute_thread.php";
 const ARCHIVE_THREAD_URL = "https://www.facebook.com/ajax/mercury/change_archived_status.php";
+const ADMIN_URL = "https://www.facebook.com/messaging/save_admins/?dpr=1";
+const POLL_URL = "https://www.facebook.com/messaging/group_polling/create_poll/?dpr=1";
+const REQUEST_URL = "https://www.facebook.com/ajax/mercury/move_thread.php";
+const SEARCH_THREAD_URL = "https://www.facebook.com/ajax/mercury/search_threads.php";
+const THREAD_PICTURES_URL = "https://www.facebook.com/ajax/messaging/attachments/sharedphotos.php";
 
 // Public FCA document IDs. Facebook changes private web query IDs without notice.
 const DOC_IDS = Object.freeze({
@@ -629,6 +634,112 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function changeAdminStatus(threadID, adminIDs, adminStatus, callback) {
+    const thread = id(threadID, "threadID");
+    if (typeof adminStatus !== "boolean") throw new TypeError("adminStatus must be a boolean");
+    const values = Array.isArray(adminIDs) ? adminIDs : [adminIDs];
+    if (!values.length || values.length > 50) throw new RangeError("adminIDs must contain 1 to 50 Facebook IDs");
+    const form = { thread_fbid: thread, add: adminStatus };
+    values.map(value => id(value, "adminID")).forEach((value, index) => {
+      form["admin_ids[" + index + "]"] = value;
+    });
+    const operation = web.post(ADMIN_URL, form).then(result => {
+      const code = result?.payload?.error;
+      if (code) {
+        const message = code === 1976004 ? "The authenticated account is not a group admin"
+          : code === 1357031 ? "Admin status can only be changed in group chats"
+          : "Facebook rejected the admin status update";
+        throw createFacebookError("changeAdminStatus: " + message, { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      if (!result?.payload) throw createFacebookError("changeAdminStatus: invalid Facebook response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function createPoll(title, threadID, options, callback) {
+    let pollOptions = options;
+    let done = callback;
+    if (typeof pollOptions === "function") { done = pollOptions; pollOptions = {}; }
+    if (pollOptions == null) pollOptions = {};
+    if (typeof title !== "string" || !title.trim() || title.length > 255) throw new TypeError("poll title must be a non-empty string up to 255 characters");
+    const thread = id(threadID, "threadID");
+    if (!pollOptions || typeof pollOptions !== "object" || Array.isArray(pollOptions)) throw new TypeError("poll options must be an object mapping option text to selected state");
+    const entries = Object.entries(pollOptions);
+    if (entries.length > 20) throw new RangeError("A poll can contain at most 20 options");
+    const form = { target_id: thread, question_text: title };
+    entries.forEach(([option, selected], index) => {
+      if (!option.trim() || option.length > 255 || typeof selected !== "boolean") throw new TypeError("Poll options must have non-empty text up to 255 characters and boolean selected values");
+      form["option_text_array[" + index + "]"] = option;
+      form["option_is_selected_array[" + index + "]"] = selected ? "1" : "0";
+    });
+    const operation = web.post(POLL_URL, form).then(result => {
+      const payload = object(result?.payload?.payload ?? result?.payload);
+      if (!result?.payload || payload.status !== "success") {
+        throw createFacebookError("createPoll: Facebook rejected the poll creation request", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return payload;
+    });
+    return callbackResult(operation, done);
+  }
+
+  function handleMessageRequest(threadIDs, accept, callback) {
+    if (typeof accept !== "boolean") throw new TypeError("accept must be a boolean");
+    const values = Array.isArray(threadIDs) ? threadIDs : [threadIDs];
+    if (!values.length || values.length > 100) throw new RangeError("handleMessageRequest requires 1 to 100 thread IDs");
+    const normalized = values.map(value => id(value, "threadID"));
+    const form = { client: "mercury" };
+    normalized.forEach((value, index) => {
+      form[(accept ? "inbox" : "other") + "[" + index + "]"] = value;
+    });
+    const operation = web.post(REQUEST_URL, form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("handleMessageRequest: Facebook rejected the message request update", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function searchForThread(name, callback) {
+    if (typeof name !== "string" || !name.trim() || name.length > 200) throw new TypeError("name must be a non-empty search string up to 200 characters");
+    const operation = web.post(SEARCH_THREAD_URL, {
+      client: "web_messenger", query: name.trim(), offset: 0, limit: 21, index: "fbid"
+    }).then(result => {
+      const payload = object(result?.payload?.payload ?? result?.payload);
+      if (payload.error) throw createFacebookError("searchForThread: Facebook rejected the thread search", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      const threads = payload.mercury_payload?.threads;
+      if (!Array.isArray(threads)) return [];
+      return threads.map(item => formatThread(item)).filter(item => item.threadID);
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function getThreadPictures(threadID, offset = 0, limit = 10, callback) {
+    if (typeof offset === "function") { callback = offset; offset = 0; limit = 10; }
+    else if (typeof limit === "function") { callback = limit; limit = 10; }
+    const thread = id(threadID, "threadID");
+    if (!Number.isInteger(offset) || offset < 0 || offset > 10000) throw new TypeError("offset must be an integer from 0 to 10000");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new TypeError("limit must be an integer from 1 to 50");
+    const operation = web.post(THREAD_PICTURES_URL, { thread_id: thread, offset, limit }).then(async result => {
+      if (result?.payload?.error) throw createFacebookError("getThreadPictures: Facebook rejected the shared-photo request", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      const images = result?.payload?.payload?.imagesData ?? result?.payload?.imagesData;
+      if (!Array.isArray(images)) throw createFacebookError("getThreadPictures: invalid shared-photo response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+      return Promise.all(images.map(async image => {
+        const imageID = String(image?.fbid ?? "");
+        if (!/^\\d{1,40}$/.test(imageID)) throw createFacebookError("getThreadPictures: invalid photo ID in response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+        const detail = await web.post(THREAD_PICTURES_URL, { thread_id: thread, image_id: imageID });
+        if (detail?.payload?.error) throw createFacebookError("getThreadPictures: Facebook rejected a photo detail request", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+        const data = detail?.payload?.jsmods?.require?.[0]?.[3]?.[1];
+        const path = data?.query_metadata?.query_path?.[0]?.message_thread;
+        const photo = path ? data?.query_results?.[path]?.message_images?.edges?.[0]?.node?.image2 : null;
+        if (!photo) throw createFacebookError("getThreadPictures: invalid photo detail response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+        return photo;
+      }));
+    });
+    return callbackResult(operation, callback);
+  }
+
   function markAsReadAll(callback) {
     const operation = web.post(READ_ALL_URL, { folder: "inbox" }).then(result => {
       if (!result?.payload || result.payload.error || result.payload.errors?.length) {
@@ -747,7 +858,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
   }
 
   return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
-    addUserToGroup, removeUserFromGroup, changeNickname, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
+    addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
 module.exports = { createFacebookThreadApi, DOC_IDS };
