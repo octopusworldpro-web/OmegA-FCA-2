@@ -50,7 +50,9 @@
     "tools/",
     "docs/BROWSER-CAPTURE.md",
     "docs/GOATBOT-EVENT-COMPATIBILITY.md",
-    "docs/GOATBOT-ATTACHMENT-COMPATIBILITY.md"
+    "docs/GOATBOT-ATTACHMENT-COMPATIBILITY.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/E2EE.md"
   ],
   "exports": {
     ".": {
