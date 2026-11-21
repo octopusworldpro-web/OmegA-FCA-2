@@ -26,10 +26,10 @@ test("deleteMessage and deleteThread preserve distinct delete-for-me semantics",
     calls.push({ url, body });
     return { payload: { success: true } };
   } } });
-  await api.deleteMessage("mid.123");
+  await api.deleteMessage(["mid.123", "mid.456"]);
   await api.deleteThread(["123456789012345", "987654321098765"]);
   assert.equal(calls[0].url, "https://www.facebook.com/ajax/mercury/delete_messages.php");
-  assert.deepEqual(calls[0].body, { "message_ids[0]": "mid.123" });
+  assert.deepEqual(calls[0].body, { client: "mercury", "message_ids[0]": "mid.123", "message_ids[1]": "mid.456" });
   assert.equal(calls[1].url, "https://www.facebook.com/ajax/mercury/delete_thread.php");
   assert.deepEqual(calls[1].body, {
     client: "mercury", "ids[0]": "123456789012345", "ids[1]": "987654321098765"
