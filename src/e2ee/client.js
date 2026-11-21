@@ -1,6 +1,5 @@
 "use strict";
 
-var http = require("./httpAdapter");
 var fs = require("fs");
 var log = require("./logger");
 
@@ -1397,7 +1396,7 @@ E2EEClient.prototype.recoverEvictedDevice = function(err) {
 E2EEClient.prototype._connect = function() {
   var self = this;
   var storePath = this.ctx.globalOptions.e2eeDevicePath;
-  if (!this.store) this.store = DeviceStore.fromFile(storePath);
+  if (!this.store) this.store = DeviceStore.fromFile(storePath, this.ctx.globalOptions.e2eeStorageKey);
   return this.fetchCat().then(function(cat) {
     self.cat = cat;
     var register = self.store.jidDevice
