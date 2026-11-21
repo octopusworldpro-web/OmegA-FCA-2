@@ -417,7 +417,8 @@ export function createSessionGuard(options: SessionGuardOptions): SessionGuard;
 
 /** Personal-account thread and group actions following public FCA web request conventions. */
 export interface FacebookThreadApi {
-  httpGet(url: string, query?: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void;\n  httpPost(url: string, form: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void;
+  httpGet(url: string, query?: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void;
+  httpPost(url: string, form: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void;
   getThreadList(limit: number, timestamp?: number | null, tags?: string[] | ((error: Error | null, result?: unknown[]) => void), callback?: (error: Error | null, result?: unknown[]) => void): Promise<unknown[]> | void;
   getThreadInfo(threadID: string | number, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   getThreadHistory(threadID: string | number, amount: number, timestamp?: number | null, callback?: (error: Error | null, result?: unknown[]) => void): Promise<unknown[]> | void;
