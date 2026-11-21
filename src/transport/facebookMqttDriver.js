@@ -10,7 +10,7 @@ const { createNativeRealtimeTransport } = require("./nativeRealtimeTransport");
 const { createFacebookThreadApi } = require("./facebookThreadApi");
 const { createFacebookWebClient } = require("../auth/facebookWebClient");
 const { readImageInput, readAttachmentInput, downloadAttachment: downloadAttachmentFile, MAX_ATTACHMENT_COUNT } = require("../compat/imageUpload");
-const { offlineThreadingId, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
+const { offlineThreadingId, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest, createMessengerPinMessageRequest } = require("./messengerActions");
 const { createHumanizer } = require("../compat/humanizer");
 const { createBroadcastSender } = require("../compat/broadcast");
 const { E2EEClient } = require("../e2ee/client");
@@ -688,6 +688,22 @@ async function createFacebookMqttDriver({
             throw error;
           }
           return result;
+        });
+        return callbackResult(operation, callback);
+      },
+      pinMessage(messageID, threadID, callback) {
+        const request = createMessengerPinMessageRequest({ messageID, threadID, pin: true });
+        const operation = driver.sendRequest(request).then(response => {
+          assertMessengerAccepted(response, "pin-message");
+          return response?.payload?.payload ?? response?.payload ?? response;
+        });
+        return callbackResult(operation, callback);
+      },
+      unpinMessage(messageID, threadID, callback) {
+        const request = createMessengerPinMessageRequest({ messageID, threadID, pin: false });
+        const operation = driver.sendRequest(request).then(response => {
+          assertMessengerAccepted(response, "unpin-message");
+          return response?.payload?.payload ?? response?.payload ?? response;
         });
         return callbackResult(operation, callback);
       },
