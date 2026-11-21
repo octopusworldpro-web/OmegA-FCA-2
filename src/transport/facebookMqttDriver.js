@@ -330,7 +330,8 @@ async function createFacebookMqttDriver({
           form["recipient_map[" + (timestamp + index) + "]"] = recipient;
         });
         const result = await webClient.post("https://www.facebook.com/mercury/attachments/forward/", form);
-        if (!result?.payload || result.payload.error) {
+        const payload = result?.payload?.payload ?? result?.payload;
+        if (!payload || payload.error) {
           const error = new Error("Facebook rejected the attachment forward request");
           error.code = "FCA_FACEBOOK_REQUEST_REJECTED";
           throw error;
