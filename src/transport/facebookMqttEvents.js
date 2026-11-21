@@ -186,7 +186,8 @@ function normalizeDelta(delta) {
       return {
         ...base, type: "read_receipt", reader,
         userID: reader,
-        watermarkTimestamp: delta.watermarkTimestamp ?? delta.watermark_timestamp ?? timestamp,
+        watermarkTimestamp: delta.watermarkTimestamp ?? delta.watermark_timestamp ??
+          metadata.watermarkTimestamp ?? metadata.watermark_timestamp ?? timestamp,
         threadID: threadID || firstId(delta.threadFbId, delta.thread_id),
         messageID: messageID || firstId(delta.messageId, delta.lastReadMessageId)
       };
