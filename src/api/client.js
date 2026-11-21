@@ -8,7 +8,7 @@ const { classifySessionState } = require("../security/sessionState");
 
 const METHOD_FEATURES = Object.freeze({
   sendRequest: "messaging", sendMessage: "messaging", editMessage: "messaging",
-  shareContact: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
+  shareContact: "messaging", uploadAttachment: "messaging", downloadAttachment: "messaging", forwardAttachment: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
   markAsDelivered: "messaging", sendTypingIndicator: "messaging",
   getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
   getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads",
@@ -20,7 +20,7 @@ const METHOD_FEATURES = Object.freeze({
 });
 
 const DRIVER_METHODS = [
-  "sendRequest", "sendMessage", "editMessage", "shareContact", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
+  "sendRequest", "sendMessage", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
   "markAsRead", "markAsDelivered", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
