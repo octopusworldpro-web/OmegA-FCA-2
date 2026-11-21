@@ -203,7 +203,7 @@ async function createFacebookMqttDriver({
         jar: {
           getCookies(url) {
             const header = session.getCookieHeader(url);
-            return header ? header.split(/;\\s*/).filter(Boolean) : [];
+            return header ? header.split(/;\s*/).filter(Boolean) : [];
           }
         },
         globalOptions: {
