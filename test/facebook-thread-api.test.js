@@ -436,3 +436,61 @@ test("markAsRead forwards Facebook failures through its legacy callback", async 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(callbackError?.code, "FCA_FACEBOOK_REQUEST_REJECTED");
 });
+
+test("getThreadList paginates large legacy limits in bounded batches", async () => {
+  const calls = [];
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    ...thread,
+    thread_key: { other_user_id: String(987654321 + index) },
+    updated_time_precise: String(1700000000000 - index * 1000)
+  }));
+  const nextThread = {
+    ...thread,
+    thread_key: { other_user_id: "999999999" },
+    updated_time_precise: "1699999899000"
+  };
+  const api = createFacebookThreadApi({ session, webClient: { post: async (url, body) => {
+    const params = JSON.parse(body.queries).o0.query_params;
+    calls.push(params);
+    return { payload: batch({ viewer: { message_threads: { nodes: params.before == null ? firstPage : [firstPage.at(-1), nextThread] } } }) };
+  } } });
+  const result = await api.getThreadList(101, null, "INBOX");
+  assert.equal(result.length, 101);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].limit, 100);
+  assert.equal(calls[1].limit, 2);
+  assert.equal(calls[1].tags[0], "INBOX");
+});
+
+test("getThreadHistory paginates legacy requests above one GraphQL page", async () => {
+  const calls = [];
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    __typename: "UserMessage",
+    message_id: "mid." + index,
+    message_sender: { id: "987654321" },
+    timestamp_precise: String(1700000000000 - index * 1000),
+    message: { text: "message " + index, ranges: [] },
+    blob_attachments: []
+  }));
+  const nextMessage = {
+    __typename: "UserMessage",
+    message_id: "mid.100",
+    message_sender: { id: "987654321" },
+    timestamp_precise: "1699999899000",
+    message: { text: "message 100", ranges: [] },
+    blob_attachments: []
+  };
+  const api = createFacebookThreadApi({ session, webClient: { post: async (url, body) => {
+    const params = JSON.parse(body.queries).o0.query_params;
+    calls.push(params);
+    const nodes = params.before == null ? firstPage : [firstPage.at(-1), nextMessage];
+    return { payload: batch({ message_thread: { thread_type: "ONE_TO_ONE", messages: { nodes } } }) };
+  } } });
+  const result = await api.getThreadHistory("123456789012345", 101);
+  assert.equal(result.length, 101);
+  assert.equal(result[100].messageID, "mid.100");
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].message_limit, 100);
+  assert.equal(calls[1].message_limit, 2);
+});
+
