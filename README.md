@@ -218,3 +218,30 @@ api.addExternalModule({
 ```
 
 The registered functions are bound to the FCA API object and cannot replace built-in methods.
+
+
+## TypeScript
+
+The package ships CommonJS runtime exports and declarations from `index.d.ts`. Node.js 20 or newer is required. In TypeScript projects, install Node.js type definitions so the public `Buffer` and Node runtime types resolve:
+
+```sh
+npm install @nirzon-islam/omega-fca
+npm install --save-dev @types/node
+```
+
+Example using the typed bot wrapper:
+
+```ts
+import { createMessengerBot, type Cookie, type MessengerBotContext } from "@nirzon-islam/omega-fca";
+
+const appState: Cookie[] = loadYourAuthorizedAppState();
+const bot = await createMessengerBot({ mode: "appstate", appState });
+
+bot.command("ping", async (ctx: MessengerBotContext) => {
+  await ctx.replyAsync("pong");
+});
+
+bot.launch();
+```
+
+See [TypeScript API and package exports](docs/TYPESCRIPT.md) for the declaration contract and compatibility notes. The declarations describe the implemented API surface; they do not imply live Facebook endpoint acceptance or complete FCA parity.

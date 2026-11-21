@@ -169,3 +169,16 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - [ ] Authorized live Facebook account acceptance (device registration, Noise handshake, reaction/edit/unsend/typing send/receive) remains required before production claims.
 
 **Status:** Core one-to-one E2EE compatibility implementation is in place. This is not a claim of full Messenger E2EE support; group encryption and encrypted backup/key-transparency capabilities remain explicit gaps.
+
+
+## Step 9 — TypeScript, exports and documentation checkpoint (2026-11-21)
+
+- [x] Audited the package root runtime exports against the public declaration file.
+- [x] Added the missing `createMessengerPinMessageRequest()` declaration and the constructible `MessengerBot` value type.
+- [x] Added a regression test that every enumerable runtime root export has a corresponding TypeScript value declaration.
+- [x] Added an explicit `test:types` script and CI step; package metadata includes the TypeScript guide.
+- [x] Added TypeScript installation/usage documentation and a typed bot example in the README.
+- [ ] TypeScript compiler-based consumer fixture is not included; the current check validates declaration/export coverage statically.
+- [ ] Authorized live Facebook acceptance remains a separate release gate and is not implied by declaration coverage.
+
+**Status:** Public TypeScript declaration/export coverage and package documentation are updated. CI verification is required before Step 9 is marked verified complete.

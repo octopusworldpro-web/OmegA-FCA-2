@@ -25,6 +25,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
       - run: npm test
+      - run: npm run test:types
       - run: npm run test:syntax
       - name: Smoke-test package root exports
         run: |

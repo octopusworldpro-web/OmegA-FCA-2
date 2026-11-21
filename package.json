@@ -13,7 +13,8 @@
     "prepublishOnly": "npm test && npm run test:syntax",
     "test:appstate": "node examples/appstate-session-check.js",
     "test:messenger-mqtt": "node examples/messenger-mqtt-smoke.js",
-    "capture:browser": "node tools/browser-capture.js"
+    "capture:browser": "node tools/browser-capture.js",
+    "test:types": "node --test test/types.test.js"
   },
   "license": "MIT",
   "keywords": [
@@ -53,7 +54,8 @@
     "docs/GOATBOT-EVENT-COMPATIBILITY.md",
     "docs/GOATBOT-ATTACHMENT-COMPATIBILITY.md",
     "THIRD_PARTY_NOTICES.md",
-    "docs/E2EE.md"
+    "docs/E2EE.md",
+    "docs/TYPESCRIPT.md"
   ],
   "exports": {
     ".": {

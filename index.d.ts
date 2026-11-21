@@ -462,6 +462,7 @@ export const MESSENGER_MQTT_APP_ID: string;
 export const SEND_MESSAGE_VERSION_ID: string;
 export function offlineThreadingId(now?: number, random?: number): string;
 export function createMessengerSendMessageRequest(input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number; timestamp?: number; otid?: string; epochId?: string; requestId?: number }): Readonly<{ app_id: string; payload: string; request_id: number | null; type: 3 }>;
+export function createMessengerPinMessageRequest(input: { threadID: string | number; messageID: string; pin?: boolean; timestamp?: number; taskId?: number; epochId?: string | number; requestId?: number }): Readonly<{ app_id: string; payload: string; request_id: number; type: 3 }>;
 
 export interface MessengerSyncCursorStore { load(): MessengerSyncCursor | null; save(cursor: MessengerSyncCursor): MessengerSyncCursor; clear(): void; readonly current: MessengerSyncCursor | null; }
 export function createMessengerSyncCursorStore(options: { filePath: string; key: string | Buffer | Uint8Array; userId: string | number }): MessengerSyncCursorStore;
@@ -549,6 +550,7 @@ export interface MessengerBot {
   stop(): Promise<void>;
   on(event: string, listener: (...args: any[]) => void): this;
 }
+export const MessengerBot: { new(client: MessengerBotClient, api: ClientApi, options?: { commandPrefix?: string; stopOnSignals?: boolean }): MessengerBot; };
 export interface MessengerBotContext {
   readonly event: unknown; readonly api: ClientApi; readonly threadID: string | number;
   readonly senderID?: string | number; readonly body: string; readonly message: string;

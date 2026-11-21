@@ -30,3 +30,14 @@ test("public declarations cover the exported client and Meta transport API", () 
   }
   assert.doesNotMatch(declarations, /reference types=["']node["']/);
 });
+
+
+test("every runtime root export has a public value declaration", () => {
+  const root = path.resolve(__dirname, "..");
+  const declarations = fs.readFileSync(path.join(root, "index.d.ts"), "utf8");
+  const api = require(root);
+  const declaredValues = new Set([...declarations.matchAll(/^export\\s+(?:declare\\s+)?(?:function|const|class|var|let|enum)\\s+([A-Za-z_$][\\w$]*)/gm)].map(match => match[1]));
+  for (const name of Object.keys(api)) {
+    assert.ok(declaredValues.has(name), `Missing TypeScript value declaration for runtime export: ${name}`);
+  }
+});
