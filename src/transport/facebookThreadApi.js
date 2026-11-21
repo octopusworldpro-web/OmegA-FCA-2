@@ -842,12 +842,17 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, done);
   }
 
-  function deleteMessage(messageID, callback) {
-    const message = String(messageID ?? "").trim();
-    if (!message || message.length > 256 || /[\u0000-\u001f]/.test(message)) {
-      throw new TypeError("messageID is invalid");
-    }
-    const operation = web.post(DELETE_MESSAGE_URL, { "message_ids[0]": message }).then(result => {
+  function deleteMessage(messageIDs, callback) {
+    const values = Array.isArray(messageIDs) ? messageIDs : [messageIDs];
+    if (!values.length || values.length > 100) throw new RangeError("deleteMessage requires 1 to 100 message IDs");
+    const normalized = values.map(value => {
+      const message = String(value ?? "").trim();
+      if (!message || message.length > 256 || /[\u0000-\u001f]/.test(message)) throw new TypeError("messageID is invalid");
+      return message;
+    });
+    const form = { client: "mercury" };
+    normalized.forEach((message, index) => { form["message_ids[" + index + "]"] = message; });
+    const operation = web.post(DELETE_MESSAGE_URL, form).then(result => {
       if (!result?.payload || result.payload.error || result.payload.errors?.length) {
         throw createFacebookError("deleteMessage: Facebook rejected the delete request", {
           code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
