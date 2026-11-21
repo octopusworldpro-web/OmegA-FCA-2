@@ -82,3 +82,60 @@ test("request ID allocation skips IDs still pending after numeric wrap", async (
   await assert.rejects(maxPending, /cleanup/);
   await assert.rejects(onePending, /cleanup/);
 });
+
+
+test("Messenger publish failure does not reject an unrelated in-flight request", async () => {
+  const config = createFacebookMqttProtocol({ userId: "123456789", requestTimeoutMs: 1000 });
+  const sent = [];
+  let failNext = false;
+  const socket = {
+    send(frame) {
+      if (failNext) {
+        failNext = false;
+        throw Object.assign(new Error("simulated socket send failure"), { code: "SEND_FAILED" });
+      }
+      sent.push(Buffer.from(frame));
+    }
+  };
+  const first = config.protocol.request(socket, { type: 3, payload: "first" });
+  const firstRequest = JSON.parse(mqtt.decodePacket(sent[0]).payload.toString());
+  failNext = true;
+  await assert.rejects(config.protocol.request(socket, { type: 3, payload: "second" }), error => error.code === "SEND_FAILED");
+  assert.equal(config.protocol.getPendingRequestCount(), 1);
+  const response = { request_id: firstRequest.request_id, payload: { ok: true } };
+  config.protocol.decodeFrame(mqtt.encodePublish({
+    topic: "/ls_resp", payload: JSON.stringify(response), qos: 0
+  }));
+  assert.deepEqual(await first, response);
+  assert.equal(config.protocol.getPendingRequestCount(), 0);
+  config.protocol.closeRequests();
+});
+
+test("sendMessage carries reply metadata through the correlated MQTT request", async () => {
+  const config = createFacebookMqttProtocol({ userId: "123456789", requestTimeoutMs: 1000 });
+  const sent = [];
+  const socket = { send: frame => sent.push(Buffer.from(frame)) };
+  const pending = config.protocol.sendMessage(socket, {
+    threadID: "987654321",
+    message: "reply body",
+    replyToMessageID: "quoted-message",
+    timestamp: 1700000000000,
+    otid: "1700000000000123",
+    epochId: "1700000000000456"
+  });
+  const packet = mqtt.decodePacket(sent[0]);
+  assert.equal(packet.topic, "/ls_req");
+  const request = JSON.parse(packet.payload.toString());
+  const envelope = JSON.parse(request.payload);
+  const task = JSON.parse(envelope.tasks[0].payload);
+  assert.equal(task.text, "reply body");
+  assert.deepEqual(task.reply_metadata, {
+    reply_source_id: "quoted-message", reply_source_type: 1, reply_type: 0
+  });
+  const response = { request_id: request.request_id, payload: { ok: true } };
+  config.protocol.decodeFrame(mqtt.encodePublish({
+    topic: "/ls_resp", payload: JSON.stringify(response), qos: 0
+  }));
+  assert.deepEqual(await pending, response);
+  config.protocol.closeRequests();
+});
