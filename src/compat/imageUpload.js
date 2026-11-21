@@ -105,6 +105,31 @@ function safeDownloadUrl(input) {
   return url;
 }
 
+async function readResponseBytes(response, maxBytes) {
+  if (response.body && typeof response.body.getReader === "function") {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let size = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = Buffer.from(value);
+        size += chunk.length;
+        if (size > maxBytes) {
+          await reader.cancel();
+          throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+        }
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks, size);
+    } finally { try { reader.releaseLock(); } catch {} }
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > maxBytes) throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+  return buffer;
+}
+
 function filenameFromDisposition(value) {
   if (typeof value !== "string") return null;
   const utf = /filename\*=UTF-8''([^;]+)/i.exec(value);
