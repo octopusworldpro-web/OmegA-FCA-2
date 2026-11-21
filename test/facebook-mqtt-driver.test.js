@@ -357,7 +357,7 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
     }
     if (url.hostname === "www.facebook.com" && url.pathname === "/messaging/send/") {
       const form = new URLSearchParams(init.body);
-      seen.push({ kind: "send", imageID: form.get("image_ids[0]"), body: form.get("body"), reply: form.get("replied_to_message_id") });
+      seen.push({ kind: "send", imageID: form.get("image_ids[0]"), fileID: form.get("file_ids[0]"), body: form.get("body"), reply: form.get("replied_to_message_id") });
       return jsonResponse({ payload: { actions: [{ thread_fbid: "123456789012345", message_id: "mid-attachment", timestamp: 1700000000000 }] } });
     }
     if (url.hostname === "www.facebook.com" && url.pathname === "/mercury/attachments/forward/") {
@@ -374,14 +374,14 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
   try {
     const sent = await driver.sendMessage({
       threadID: "123456789012345",
-      message: { body: "photo caption", attachment: png },
+      message: { body: "photo caption", attachment: [png, Buffer.from("%PDF-1.7 test")] },
       replyToMessageID: "mid-reply"
     });
     assert.equal(sent.messageID, "mid-attachment");
-    assert.equal(sent.attachments[0].attachmentID, "987654321");
-    assert.deepEqual(seen.find(item => item.kind === "upload").fields.slice(0, 3), ["voice_clip", "upload_0", "av"]);
+    assert.equal(sent.attachments[0].attachmentID, "987654321");\n    assert.equal(sent.attachments[1].attachmentID, "876543210");\n    assert.equal(sent.attachments[1].type, "file");
+    assert.deepEqual(seen.find(item => item.kind === "upload").fields.slice(0, 4), ["voice_clip", "upload_0", "upload_1", "av"]);
     assert.deepEqual(seen.find(item => item.kind === "send"), {
-      kind: "send", imageID: "987654321", body: "photo caption", reply: "mid-reply"
+      kind: "send", imageID: "987654321", fileID: "876543210", body: "photo caption", reply: "mid-reply"
     });
 
     const uploaded = await driver.uploadAttachment(png);
