@@ -158,8 +158,14 @@ export interface ClientApi {
   reactToPost?(postID: string | number, type: string | number, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   reactToComment?(commentID: string | number, type: string | number, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   handleFriendRequest?(userID: string | number, accept: boolean, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
-  markAsRead?: (...args: any[]) => any; setMessageReaction?: (...args: any[]) => any;
-  sendTypingIndicator?: (...args: any[]) => any; unsendMessage?: (...args: any[]) => any;
+  editMessage?(text: string, messageID: string, callback?: (error: Error | null, result?: { body: string; messageID: string }) => void): Promise<{ body: string; messageID: string }> | void;
+  unsendMessage?(messageID: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  markAsRead?(threadID: string | number, read?: boolean | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  markAsReadAll?(callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  markAsSeen?(timestamp?: number | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  markAsDelivered?(threadID: string | number, messageID: string | number, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  setMessageReaction?: (...args: any[]) => any;
+  sendTypingIndicator?: (...args: any[]) => any;
   changeNickname?: (...args: any[]) => any; addUserToGroup?: (...args: any[]) => any;
   removeUserFromGroup?: (...args: any[]) => any; createNewGroup?: (...args: any[]) => any;
   getThreadHistory?: (...args: any[]) => any; getMessage?: (...args: any[]) => any;
