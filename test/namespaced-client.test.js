@@ -25,3 +25,23 @@ test("createFcaClient groups and binds only methods present on the source API", 
   ]);
   assert.throws(() => createFcaClient(null), /FCA API object/);
 });
+
+test("createFcaClient exposes pin and social methods in their namespaces", () => {
+  const api = {
+    pinMessage: (...args) => ["pin", ...args],
+    unpinMessage: (...args) => ["unpin", ...args],
+    sendFriendRequest: (...args) => ["request", ...args],
+    followUser: (...args) => ["follow", ...args],
+    unfollowUser: (...args) => ["unfollow", ...args],
+    postComment: (...args) => ["comment", ...args],
+    sharePost: (...args) => ["share", ...args]
+  };
+  const client = createFcaClient(api);
+  assert.deepEqual(client.threads.pin("m1", "t1"), ["pin", "m1", "t1"]);
+  assert.deepEqual(client.threads.unpin("m1", "t1"), ["unpin", "m1", "t1"]);
+  assert.deepEqual(client.users.sendFriendRequest("u1"), ["request", "u1"]);
+  assert.deepEqual(client.users.followUser("u1"), ["follow", "u1"]);
+  assert.deepEqual(client.users.unfollowUser("u1"), ["unfollow", "u1"]);
+  assert.deepEqual(client.posts.comment("Nice", "p1"), ["comment", "Nice", "p1"]);
+  assert.deepEqual(client.posts.share("p1"), ["share", "p1"]);
+});
