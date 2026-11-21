@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const { Readable } = require("node:stream");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -407,7 +408,7 @@ test("uploads, sends, downloads and forwards Messenger attachments through bound
   try {
     const sent = await driver.sendMessage({
       threadID: "123456789012345",
-      message: { body: "photo caption", attachment: [png, Buffer.from("%PDF-1.7 test")] },
+      message: { body: "photo caption", attachment: [png, Readable.from([Buffer.from("%PDF-1.7 "), Buffer.from("stream test")])] },
       replyToMessageID: "mid-reply"
     });
     assert.equal(sent.messageID, "mid-attachment");
