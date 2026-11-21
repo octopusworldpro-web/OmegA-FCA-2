@@ -48,7 +48,9 @@
     "docs/REALTIME-FRAME-EVIDENCE.md",
     "docs/NESTED-REALTIME-PAYLOAD.md",
     "tools/",
-    "docs/BROWSER-CAPTURE.md"
+    "docs/BROWSER-CAPTURE.md",
+    "docs/GOATBOT-EVENT-COMPATIBILITY.md",
+    "docs/GOATBOT-ATTACHMENT-COMPATIBILITY.md"
   ],
   "exports": {
     ".": {
