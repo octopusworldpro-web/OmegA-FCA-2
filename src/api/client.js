@@ -273,7 +273,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       methods: Object.freeze(DRIVER_METHODS.filter(method => typeof driver[method] === "function")),
       events: typeof driver.listen === "function",
       sessionGuard: typeof driver.sessionGuard === "function",
-      e2ee: false
+      e2ee: typeof driver.connectE2EE === "function" && typeof driver.sendE2EEMessage === "function"
     });
     facade.getConnectionState = () => supervisor.snapshot();
     facade.getLicense = () => verifiedLicense;
