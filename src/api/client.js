@@ -16,7 +16,7 @@ const METHOD_FEATURES = Object.freeze({
   createNewGroup: "groups", addUserToGroup: "groups", removeUserFromGroup: "groups",
   changeNickname: "groups", changeAdminStatus: "groups", createPoll: "groups", changeGroupImage: "groups", changeAvatar: "groups", changeBlockedStatus: "users", changeBio: "users", unfriend: "users",
   changeThreadColor: "groups", changeThreadEmoji: "groups", setTitle: "groups",
-  pinMessage: "groups", unpinMessage: "groups",
+  pinMessage: "groups", unpinMessage: "groups", sendFriendRequest: "users", followUser: "users", unfollowUser: "users", postComment: "users",
   setMessageReaction: "reactions", setPostReaction: "reactions", reactToPost: "reactions", reactToComment: "reactions", handleFriendRequest: "users"
 });
 
@@ -24,7 +24,7 @@ const DRIVER_METHODS = [
   "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "httpPostFormData", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "saveSession", "restoreSessionBackup", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "setPostReaction", "reactToPost", "reactToComment", "handleFriendRequest", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeBlockedStatus", "changeBio", "unfriend", "getEmojiUrl", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
-  "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl", "pinMessage", "unpinMessage"
+  "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl", "pinMessage", "unpinMessage", "sendFriendRequest", "followUser", "unfollowUser", "postComment"
 ];
 
 function createClient({ authenticate, options = {}, reconnect = {}, license = {}, requireLicense = false, onLicenseError = () => {} } = {}) {
