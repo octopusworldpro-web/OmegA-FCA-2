@@ -461,7 +461,14 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
       client_mutation_id: 1, actor_id: currentUserID,
       action: value === "" ? "REMOVE_REACTION" : "ADD_REACTION", message_id: messageID, reaction: value
     } }), dpr: 1 };
-    const operation = web.post(REACTION_URL, body).then(result => result.payload);
+    const operation = web.post(REACTION_URL, body).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("setMessageReaction: Facebook rejected the reaction update", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
     return callbackResult(operation, callback);
   }
 
@@ -622,7 +629,14 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     const thread = id(threadID, "threadID");
     const body = { ["ids[" + thread + "]"]: read, watermarkTimestamp: Date.now(),
       shouldSendReadReceipt: true, commerce_last_message_type: "non_ad" };
-    const operation = web.post(READ_URL, body).then(result => result.payload);
+    const operation = web.post(READ_URL, body).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("markAsRead: Facebook rejected the read receipt", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
     return callbackResult(operation, callback);
   }
 
