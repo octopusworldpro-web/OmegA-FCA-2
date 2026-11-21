@@ -71,7 +71,29 @@ export function createFacebookError(message: string, options?: {
   code?: string; status?: number; sessionState?: "checkpoint" | "logged_out" | "error"; retryable?: boolean;
 }): FacebookResponseError;
 export interface ConnectionContext { attempt: number; generation: number; signal: AbortSignal; }
+export interface E2EEStatus {
+  connected: boolean;
+  deviceId: number | null;
+  persistentStorage: boolean;
+  storageEncrypted: boolean;
+}
+export interface E2EELoginOptions {
+  /** Enable encrypted device persistence with an explicit 32-byte key (Buffer/Uint8Array) or 64-character hex string. */
+  e2eeStorageKey?: string | Buffer | Uint8Array;
+  /** Optional encrypted E2EE device-store path. Defaults to ~/.omega-fca/e2ee/<userId>.json when a key is supplied. */
+  e2eeDevicePath?: string;
+  e2eeDeviceListCacheMs?: number;
+  e2eeFrameLog?: string;
+  e2ee?: boolean;
+}
 export interface TransportDriver {
+  connectE2EE?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  _connectE2EEAndMerge?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  sendE2EEMessage?(threadID: string | number, message: string | { body?: string; attachment?: AttachmentInput }, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  sendE2EEAttachment?(threadID: string | number, attachment: AttachmentInput, caption?: string, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  downloadE2EEAttachment?(attachment: Record<string, unknown>, callback?: (error: Error | null, buffer?: Buffer) => void): Promise<Buffer> | void;
+  isE2EEThread?(threadID: string | number): boolean;
+  getE2EEStatus?(): E2EEStatus;
   listen(callback: (error: Error | null, event?: unknown) => void): (() => void) | void;
   disconnect?(): void | Promise<void>; getCurrentUserID?(): string | number | null | Promise<string | number | null>; getAppState?(): Cookie[] | Promise<Cookie[]>; getCookies?(): string | Promise<string>; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; refreshFb_dtsg?(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>;
   changeAvatar?(image: Uint8Array | Blob | AsyncIterable<Uint8Array>, caption?: string | number | ((error: Error | null, result?: Record<string, unknown>) => void), timestamp?: number | ((error: Error | null, result?: Record<string, unknown>) => void), callback?: (error: Error | null, result?: Record<string, unknown>) => void): Promise<Record<string, unknown>> | void;
@@ -101,6 +123,13 @@ export interface LicenseOptions {
   checkIntervalMs?: number; refresh?: () => string | Promise<string>;
 }
 export interface ClientApi {
+  connectE2EE?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  _connectE2EEAndMerge?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  sendE2EEMessage?(threadID: string | number, message: string | { body?: string; attachment?: AttachmentInput }, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  sendE2EEAttachment?(threadID: string | number, attachment: AttachmentInput, caption?: string, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  downloadE2EEAttachment?(attachment: Record<string, unknown>, callback?: (error: Error | null, buffer?: Buffer) => void): Promise<Buffer> | void;
+  isE2EEThread?(threadID: string | number): boolean;
+  getE2EEStatus?(): E2EEStatus;
   getCurrentUserID(): string | null; getCookies?(): string; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; getAppState?(): Cookie[]; getUserID?(): string | null; getUserID?(name: string, callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; getUID?(input: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; resolvePhotoUrl?(photoID: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getFriendsList?(callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; createNewGroup?(participantIDs: Array<string | number>, groupTitle?: string | ((error: Error | null, result?: string) => void) | null, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getConnectionState(): ConnectionSnapshot; getLicense(): VerifiedLicense | null;
   getCapabilities(): Readonly<{ methods: readonly string[]; events: boolean; sessionGuard: boolean; e2ee: false }>;
   listen(callback: (event: unknown) => void): () => void;
@@ -402,7 +431,7 @@ export function createMessengerSendMessageRequest(input: { threadID: string | nu
 export interface MessengerSyncCursorStore { load(): MessengerSyncCursor | null; save(cursor: MessengerSyncCursor): MessengerSyncCursor; clear(): void; readonly current: MessengerSyncCursor | null; }
 export function createMessengerSyncCursorStore(options: { filePath: string; key: string | Buffer | Uint8Array; userId: string | number }): MessengerSyncCursorStore;
 
-export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState?: Cookie[]; sessionGuard?: NativeDriverSessionGuardOptions; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; }
+export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState?: Cookie[]; options?: E2EELoginOptions & Record<string, unknown>; sessionGuard?: NativeDriverSessionGuardOptions; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; }
 export interface NativeDriverSessionGuardOptions extends Omit<SessionGuardOptions, "getSession"> { intervalMs?: number; }
 export function createFacebookMqttDriver(options: FacebookMqttDriverOptions): Promise<TransportDriver & { getCurrentUserID(): string; getAppState(): Cookie[]; getCookies(): string; refreshFb_dtsg(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>; getSessionState(): "active"; sendRequest(payload: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<unknown>; sendMessage(input: { threadID: string | number; message: string | { body?: string; sticker?: string | number; attachment?: AttachmentInput | AttachmentInput[]; url?: string; mentions?: Array<{ tag: string; id?: string | number; fromIndex?: number }> }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; uploadAttachment(input: AttachmentInput | AttachmentInput[]): Promise<UploadedAttachment[]>; downloadAttachment(url: string, options?: { maxBytes?: number; timeoutMs?: number }): Promise<DownloadedAttachment>; forwardAttachment(attachmentID: string | number, recipients: string | number | Array<string | number>, callback?: (error?: Error | null) => void): Promise<{ success: true; attachmentID: string; recipients: string[] }> | void; sessionGuard(requestedPath?: string, options?: { interval?: number; debounce?: number }): Readonly<{ filePath: string; backupPath: string; saveNow(): Promise<string> }>; stopSessionGuard(): Promise<boolean>; disconnect(): Promise<void>; }>;
 export interface MessengerSyncCursor { syncToken: string | null; lastSeqId: string | number | null; }
