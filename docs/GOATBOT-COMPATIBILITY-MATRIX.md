@@ -2,8 +2,8 @@
 
 **Target:** `nirzon-islam/OmegA-Goatbot`  
 **GoatBot branch reviewed:** `fca-migration-cleanup`  
-**OmegA-FCA branch:** `prerelease/0.1.6-rc.3`  
-**Status:** Native AppState/MQTT integration wired on the working branch; live acceptance and full FCA parity are still unverified.
+**OmegA-FCA branch:** `main` (package `0.1.6-rc.3`)  
+**Status:** Full 271-JavaScript-file GoatBot call-site audit completed on 2026-11-21. Native AppState/MQTT integration is wired; live acceptance and complete FCA parity remain unverified. See [complete call-site inventory](GOATBOT-CALLSITE-INVENTORY.md).
 
 This matrix separates what the current OmegA-FCA facade exposes from what still requires a real transport and end-to-end verification. A method appearing in the facade means only that the injected driver supplied it; it does not mean Facebook behavior is implemented by this package.
 
@@ -22,7 +22,7 @@ This matrix separates what the current OmegA-FCA facade exposes from what still 
 | `sessionGuard(path, options)` | Native encrypted sidecar, opt-in | Preserves GoatBot’s legacy `account.txt` argument as an activation alias; the actual encrypted snapshot and backup live at `FCA_SESSION_FILE`, never in `account.txt`. The legacy `interval` option is honored; `debounce` is accepted but does not change periodic snapshot behavior. |
 | `stopSessionGuard()` | Native encrypted guard lifecycle | Stops periodic saves, performs a final encrypted save, and closes the guard. |
 | `setOptions(options)` | Native runtime event options | Supports `logLevel`, `selfListen`, `selfListenEvent`, `listenEvents`, `listenTyping`, `updatePresence`, `autoMarkDelivery`, and `autoMarkRead`; rejects unknown options instead of silently ignoring them. |
-| `e2ee.isConnected()` | Not implemented | No E2EE implementation in this branch. |
+| `_connectE2EEAndMerge()` | Not implemented | GoatBot conditionally probes this private hook in `bot/login/loadData.js`; FCA-2 reports `getCapabilities().e2ee === false` and does not expose it. |
 
 ## Legacy listener option behaviour
 
@@ -56,29 +56,29 @@ The client exposes each method below only when the injected driver provides that
 | `getUserID(name)`, `getUID(profile)` | `threads` | Native typeahead user search and Facebook profile URL/numeric-ID resolution; synthetic tests added. `getUserID()` with no argument is not a current-account alias; use `getCurrentUserID()`. |
 | `resolvePhotoUrl(photoID)` | `threads` | Native authenticated Mercury photo URL lookup with HTTPS Facebook CDN host validation. |
 | `getUserInfo`, `getThreadInfo`, `getThreadList`, `getThreadHistory` | `threads` | Native AppState-backed web actions with synthetic tests; live Facebook endpoint behavior is unverified. |
-| `httpPost` | compatibility | Authenticated low-level POST returning response text; restricted to Facebook/Messenger HTTPS hosts and bounded request/response sizes. Supports custom GoatBot GraphQL commands such as friend-request management. |
+| `httpPost` | compatibility | Authenticated low-level POST is exposed, but no direct `api.httpPost()` call was found in the complete scan of the reviewed GoatBot branch. |
 | `getMessage` | `threads` | Implemented by looking up the requested ID in the latest 100 normalized thread-history messages; callback and Promise forms are supported. Older messages may require a future cursor-based lookup. |
 | `editMessage` | `messaging` | Native MQTT task builder + correlated response parser; synthetic request/response test added. Live edit acceptance and old-message rejection still require owner testing. |
 | `shareContact` | `messaging` | Native MQTT contact-sharing task builder with correlated response; accepts GoatBot's legacy fourth message-ID argument as an ignored compatibility placeholder. Live acceptance is unverified. |
 | `getFriendsList` | `threads` | Native authenticated `/chat/user_info_all` query with normalized friend metadata; synthetic tests added. Live endpoint acceptance is unverified. |
-| `getUserID` | `threads` | Alias to the authenticated account identity. |
+| `getUserID(name)` | `threads` | Native typeahead lookup exists; GoatBot uses `getCurrentUserID()` for its own identity and `getUID()` in `pp.js`. |
 | `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `setTitle` | `groups` | Native AppState-backed web actions with synthetic tests; live acceptance is unverified. |
 | `createNewGroup` | `groups` | Native authenticated GraphQL group-create mutation with participant validation and normalized thread ID; synthetic request/response test added. Live acceptance is unverified. |
 | `setMessageReaction` | `reactions` | Native AppState-backed web action with synthetic tests; live acceptance is unverified. |
 | `changeThreadColor`, `changeThreadEmoji` | `threads` | Native AppState-backed customization endpoints with synthetic tests; live acceptance is unverified. |
 
-## Additional legacy methods found in the partial GoatBot command audit
+## Complete GoatBot call-site audit
 
-The source scan of the current `fca-migration-cleanup` branch found additional method calls beyond the core login contract:
+The complete static scan covers all 271 JavaScript files and 28 Eta templates in the reviewed `fca-migration-cleanup` tree. It includes login/lifecycle, commands, events, database, dashboard and custom helpers. The full method-to-file map, event contract, option audit, exact signature mismatches and security findings are recorded in [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md).
 
-- Implemented in the native facade: `getAppState`, `refreshFb_dtsg`, `httpPost`, `sendMessage`, `unsendMessage`, `markAsDelivered`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `setTitle`, `changeThreadColor`, `changeThreadEmoji`, `sendTypingIndicator`, and `setMessageReaction`.
-- Still missing or not verified: `changeGroupImage` and `changeAvatar`. `setOptions` now applies the supported native listener filters documented above; full parity with every legacy FCA option remains incomplete.
-- This was a partial scan of command files, not the complete 271-file repository inventory; event handlers, dashboard, database, custom scripts, and dynamically accessed methods still need review.
+Confirmed direct calls include `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `getUID`, `sendMessage`, `editMessage`, `unsendMessage`, `setMessageReaction`, `markAsRead`, `markAsDelivered`, `shareContact`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadColor` and `changeThreadEmoji`.
+
+The scan also found concrete mismatches: the startup auto-sync passes an unsupported `getThreadList` limit/tag shape; one command requests 1,000 history items where FCA-2 caps the call at 100; attachment-bearing `sendMessage` is rejected; reply events lack the legacy `messageReply` object; read receipts are emitted as `read` while GoatBot expects `read_receipt`; and E2EE is not implemented. `changeGroupImage`, `changeAvatar` and `shareContact` now have native code paths, but live Facebook acceptance remains unverified.
 
 ## Required work before migration
 
 - Complete live validation of the owner-supplied AppState session; username/password and 2FA login remain deferred, and checkpoint resolution remains manual.
-- Complete the source-level inventory of every FCA method/event used across GoatBot commands, events, dashboard, database and custom scripts; this matrix is not yet a complete call-site inventory.
+- Use [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md) as the completed source-level call-site baseline; resolve the listed signature, attachment and event-shape mismatches before claiming drop-in compatibility.
 - Add the missing legacy methods and event shapes only when their request contracts and behavior are evidenced; do not return dummy success responses.
 - Validate native MQTT frame decoding, event normalization, readiness, reconnect and deterministic shutdown against an authorized account; synthetic fake-broker coverage is not live acceptance.
 - Run the owner-operated `npm run test:messenger-mqtt` check for live readiness and inbound events; use its explicit opt-in send mode only against a thread the owner controls and verify recipient delivery.
