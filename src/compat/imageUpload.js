@@ -118,7 +118,7 @@ async function readResponseBytes(response, maxBytes) {
         size += chunk.length;
         if (size > maxBytes) {
           await reader.cancel();
-          throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+          throw new RangeError("Attachment download exceeds the configured byte limit");
         }
         chunks.push(chunk);
       }
@@ -126,7 +126,7 @@ async function readResponseBytes(response, maxBytes) {
     } finally { try { reader.releaseLock(); } catch {} }
   }
   const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.length > maxBytes) throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+  if (buffer.length > maxBytes) throw new RangeError("Attachment download exceeds the configured byte limit");
   return buffer;
 }
 
@@ -167,7 +167,7 @@ async function downloadAttachment(input, options = {}) {
       throw error;
     }
     const declared = Number(response.headers?.get?.("content-length") || 0);
-    if (declared > maxBytes) throw new RangeError("Attachment download exceeds the 25 MiB safety limit");
+    if (declared > maxBytes) throw new RangeError("Attachment download exceeds the configured byte limit");
     const buffer = await readResponseBytes(response, maxBytes);
     return Object.freeze({
       buffer, size: buffer.length,
