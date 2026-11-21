@@ -35,8 +35,8 @@ Status labels:
 ## Implementation order
 
 1. Keep the Node 20/22 CI matrix green and retain deterministic tests for MQTT CONNECT/CONNACK, SUBACK, keepalive cadence, cursor recovery, listener teardown and reconnect.
-2. Complete a repository-wide GoatBot call-site inventory (commands, events, dashboard, database, custom scripts and dynamic calls); classify every method and event shape as required, optional, or unused.
-3. Implement only methods whose transport and request/response contract can be evidenced. For unknown private GraphQL document IDs or action payloads, keep the method explicitly unsupported rather than fabricate success.
+2. **Complete.** The full scan of all 271 GoatBot JavaScript files and 28 Eta templates is recorded in [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md), including method-to-file mapping, event types, login options, dynamic E2EE hook and security findings.
+3. Resolve the concrete call-site mismatches in the inventory: thread-list limit/tags, thread-history limit, attachment-bearing sends, legacy reply objects, read-receipt event naming and sendMessage positional reply arguments. Implement only evidence-backed request contracts; never fabricate success.
 4. Complete event normalization and legacy callback signatures, including messages, replies, unsends, reactions, typing, read/delivery receipts, thread updates and presence where supported by observed frames.
 5. Complete attachments with bounded streaming, MIME/size validation, safe temporary-file handling and tests before exposing send/upload methods.
 6. Complete API declarations, README examples, compatibility matrix and package smoke tests from the same public surface.
@@ -46,7 +46,7 @@ Status labels:
 
 Do not merge to stable, publish the `latest` tag, or migrate production GoatBot until:
 - Node 20 and 22 CI pass on the exact release commit;
-- repository-wide GoatBot API/event inventory is complete;
+- the completed 271-file GoatBot API/event inventory is maintained in `GOATBOT-CALLSITE-INVENTORY.md`;
 - all required methods have real implementations or explicit documented unsupported status;
 - owner-operated live-account checks pass for the supported feature set;
 - no credentials, AppState, TOTP seeds, cookies, page tokens or encryption keys appear in fixtures, logs, commits or CI artifacts.
@@ -62,8 +62,22 @@ The personal-account transport is unofficial and not a Meta-supported API. Faceb
 
 ## GoatBot listener options verified in the native compatibility layer
 
-The current implementation forwards login-time options from the callback adapter and applies the following event behaviours: `selfListen`, `selfListenEvent`, `listenEvents`, `listenTyping`, `updatePresence`, `autoMarkDelivery`, and `autoMarkRead`. `setOptions()` updates those supported runtime flags and rejects unknown options. The native driver also forwards `userAgent`; proxy support remains explicitly unsupported. Synthetic tests cover the event filters and runtime updates. This is not complete parity with every Eryxen/FCA configuration option.
+The current implementation forwards login-time options from the callback adapter and applies the following event behaviours: `selfListen`, `selfListenEvent`, `listenEvents`, `listenTyping`, `updatePresence`, `autoMarkDelivery`, and `autoMarkRead`. `setOptions()` updates those supported runtime flags and rejects unknown options. The native driver also forwards `userAgent`; proxy support remains explicitly unsupported. Synthetic tests cover the event filters and runtime updates. This is not complete parity with every Eryxen/FCA configuration option. The full GoatBot option comparison and the unconsumed `forceLogin` / `autoReconnect` settings are documented in `GOATBOT-CALLSITE-INVENTORY.md`.
 
+
+## GoatBot call-site audit hand-off
+
+The repository-wide call-site inventory is complete for the reviewed GoatBot tree. It surfaced additional compatibility blockers that are not visible from a method-name-only API comparison:
+
+- GoatBot startup auto-sync passes `getThreadList(9999999, null, "INBOX")`, but the native method currently accepts a 1–100 limit and an array of tags.
+- One command requests 1,000 thread-history messages, while the native method caps each call at 100.
+- Attachment-bearing `sendMessage` payloads are rejected by the current MQTT send builder.
+- The native normalizer does not build the legacy nested `event.messageReply` object and does not normalize raw attachments to the legacy `type` / `url` shape.
+- The normalizer emits read receipts as `read`; GoatBot dispatches `read_receipt`.
+- GoatBot conditionally calls the private `_connectE2EEAndMerge()` hook; FCA-2 reports E2EE as unsupported and does not expose the hook.
+- The reviewed GoatBot dependency remains pinned to `0.1.6-rc.2`, while FCA-2 main is `0.1.6-rc.3`.
+
+These findings complete audit item #1, not the implementation or live-acceptance gates. See [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md) for the full method-to-file mapping and security notes.
 
 ## Exact public Eryxen API checklist
 
