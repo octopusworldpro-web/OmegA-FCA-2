@@ -200,7 +200,12 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
         if (typeof threadID === "string" || typeof threadID === "number") {
           input = { threadID, message };
           done = typeof callback === "function" ? callback : null;
-          if (replyToMessageID != null) input.replyToMessageID = replyToMessageID;
+          // Some legacy FCA call sites pass the reply ID as argument three,
+          // omitting the optional callback. Preserve that overload.
+          const replyID = replyToMessageID != null
+            ? replyToMessageID
+            : (typeof callback === "string" || typeof callback === "number" ? callback : null);
+          if (replyID != null) input.replyToMessageID = replyID;
         } else {
           input = message;
           done = typeof threadID === "function" ? threadID : null;
