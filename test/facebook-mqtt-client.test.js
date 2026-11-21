@@ -65,6 +65,9 @@ test("first-party client logs in with AppState and exposes callback-compatible M
   assert.equal(typeof api.changeNickname, "function");
   assert.equal(typeof api.setMessageReaction, "function");
   assert.equal(typeof api.markAsRead, "function");
+  for (const method of ["editMessage", "unsendMessage", "markAsReadAll", "markAsSeen", "markAsDelivered"]) {
+    assert.equal(typeof api[method], "function", method);
+  }
   let readyEvent = null;
   const stop = api.listenMqtt((error, event) => {
     if (!error && event?.type === "ready") readyEvent = event;
