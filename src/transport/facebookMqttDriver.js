@@ -255,7 +255,7 @@ async function createFacebookMqttDriver({
         const uploaded = await uploadAttachments(message.attachment);
         const grouped = { image_id: "image_ids", gif_id: "gif_ids", video_id: "video_ids", audio_id: "audio_ids", file_id: "file_ids" };
         const positions = Object.create(null);
-        for (const item of uploaded) {
+        for (const item of uploadedAttachments) {
           const key = grouped[item.idKey];
           const position = positions[key] || 0;
           form[key + "[" + position + "]"] = item.attachmentID;
@@ -306,7 +306,7 @@ async function createFacebookMqttDriver({
         threadID: String(action.thread_fbid || threadID),
         messageID: String(action.message_id),
         timestamp: action.timestamp ?? null,
-        attachments: hasFiles ? await Promise.resolve([]) : []
+        attachments: uploadedAttachments.map(item => ({ attachmentID: item.attachmentID, type: item.type, fileName: item.fileName, mimeType: item.mimeType, size: item.size }))
       };
     }
 
