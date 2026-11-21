@@ -49,7 +49,9 @@ The client exposes each method below only when the injected driver provides that
 | Method | License feature gate (when licensing enabled) | Current status |
 |---|---|---|
 | `sendMessage` | `messaging` | Text/sticker/reply via native MQTT; attachment and URL sends via authenticated legacy Messenger upload/send flow. Synthetic upload/send tests exist; live broker/recipient acceptance remains unverified. |
-| `markAsRead` | `messaging` | Native AppState-backed web action with synthetic request/response tests; live endpoint acceptance is unverified. |
+| `markAsRead`, `markAsReadAll`, `markAsSeen` | `messaging` | Native authenticated receipt actions with synthetic request/response tests; live endpoint acceptance is unverified. |
+| `deleteMessage` | `messaging` | Native delete-for-me endpoint, deliberately distinct from `unsendMessage`; synthetic tests exist, live acceptance is unverified. |
+| `deleteThread`, `muteThread`, `changeArchivedStatus` | `threads` | Native authenticated thread actions (single/multiple IDs where supported) with synthetic tests; live acceptance is unverified. |
 | `unsendMessage` | `messaging` | Native authenticated unsend endpoint with synthetic success/error tests; live acceptance is unverified. |
 | `markAsDelivered` | `messaging` | Native authenticated delivery-receipt endpoint with synthetic tests; live acceptance is unverified. |
 | `sendTypingIndicator` | `messaging` | Native authenticated typing endpoint; supports the legacy FCA argument order and the simpler thread/state form, with synthetic tests. Live acceptance is unverified. |
@@ -71,7 +73,7 @@ The client exposes each method below only when the injected driver provides that
 
 The complete static scan covers all 271 JavaScript files and 28 Eta templates in the reviewed `fca-migration-cleanup` tree. It includes login/lifecycle, commands, events, database, dashboard and custom helpers. The full method-to-file map, event contract, option audit, exact signature mismatches and security findings are recorded in [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md).
 
-Confirmed direct calls include `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `getUID`, `sendMessage`, `editMessage`, `unsendMessage`, `setMessageReaction`, `markAsRead`, `markAsDelivered`, `shareContact`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadColor` and `changeThreadEmoji`.
+Confirmed direct calls include `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `getUID`, `sendMessage`, `editMessage`, `unsendMessage`, `setMessageReaction`, `markAsRead`, `markAsReadAll`, `markAsSeen`, `markAsDelivered`, `deleteMessage`, `deleteThread`, `muteThread`, `changeArchivedStatus`, `shareContact`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadColor` and `changeThreadEmoji`.
 
 The scan also found remaining mismatches: startup auto-sync passes an unsupported `getThreadList` limit/tag shape; one command requests 1,000 history items where FCA-2 caps the call at 100; some legacy `sendMessage` call sites pass reply IDs in the wrong positional slot; and E2EE is not implemented. Messenger attachment upload/send/download/forward, nested `messageReply`, and `read_receipt` event naming now have source-level implementations. All private Facebook endpoint behavior remains subject to authorized live acceptance.
 
