@@ -468,7 +468,7 @@ test("native driver exposes callback-compatible saveSession and bounded multipar
       new FormData()
     );
     assert.equal(response.status, 200);
-    await assert.rejects(driver.httpPostFormData("https://example.com/upload", new FormData()), /Facebook\/Messenger HTTPS/);
+    await assert.rejects(driver.httpPostFormData("https://example.com/upload", new FormData()), /HTTPS Facebook\/Messenger/);
   } finally {
     if (driver) await driver.disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
