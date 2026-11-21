@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createFacebookThreadApi } = require("../src/transport/facebookThreadApi");
 
-const session = { userId: "123456789012345" };
+const session = { userId: "123456789012345", request: async () => { throw new Error("unused"); } };
 
 test("changeAdminStatus and createPoll use documented FCA request contracts", async () => {
   const calls = [];
