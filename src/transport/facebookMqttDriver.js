@@ -274,8 +274,9 @@ async function createFacebookMqttDriver({
         const shared = await webClient.post("https://www.facebook.com/message_share_attachment/fromURI/", {
           image_height: 960, image_width: 960, uri: shareUrl.toString()
         });
-        const params = shared?.payload?.share_data?.share_params;
-        if (shared?.payload?.error || typeof params !== "string" || !params) {
+        const sharePayload = shared?.payload?.payload ?? shared?.payload;
+        const params = sharePayload?.share_data?.share_params;
+        if (sharePayload?.error || typeof params !== "string" || !params) {
           const error = new Error("Facebook could not prepare the shared URL");
           error.code = "FCA_ATTACHMENT_SHARE_FAILED";
           throw error;
@@ -294,7 +295,7 @@ async function createFacebookMqttDriver({
         });
       }
       const result = await webClient.post("https://www.facebook.com/messaging/send/", form);
-      const payload = result?.payload;
+      const payload = result?.payload?.payload ?? result?.payload;
       if (!payload || payload.error || !Array.isArray(payload.actions)) {
         const error = new Error("Facebook rejected the attachment message or returned an invalid response");
         error.code = payload?.error ? "FCA_FACEBOOK_REQUEST_REJECTED" : "FCA_RESPONSE_SHAPE_INVALID";
