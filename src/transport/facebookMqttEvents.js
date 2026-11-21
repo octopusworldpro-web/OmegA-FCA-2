@@ -139,8 +139,7 @@ function normalizeDelta(delta) {
 
   switch (kind) {
     case "NewMessage":
-    case "Message":
-    case "ClientPayload": {
+    case "Message": {
       const replyTo = firstId(metadata.replySourceMessageId, metadata.replyToMessageId,
         delta.replyToMessageId, delta.reply_to_message_id, delta.replySourceMessageId);
       const attachments = normalizeAttachments(delta.attachments, delta.blob_attachments,
@@ -149,6 +148,8 @@ function normalizeDelta(delta) {
       const event = {
         ...base,
         type: replyTo || messageReply ? "message_reply" : "message",
+        userID: senderID,
+        author: senderID,
         body: safeText(delta.body ?? delta.text ?? delta.message),
         attachments,
         isGroup: Boolean(threadKey.threadFbId),
@@ -167,6 +168,7 @@ function normalizeDelta(delta) {
     case "Reaction":
       return {
         ...base, type: "message_reaction",
+        author: senderID,
         reaction: firstString(delta.reaction, delta.reactionEmoji, delta.reactionString, delta.reaction_emoji),
         userID: senderID,
         messageID: messageID || firstId(delta.messageId, delta.targetMessageId)
@@ -200,7 +202,7 @@ function normalizeDelta(delta) {
         return {
           ...base, type: "event", logMessageType: logType,
           logMessageData: logData,
-          author: actor,
+          author: actor, userID: actor,
           participantIDs: Array.isArray(delta.participantIds)
             ? delta.participantIds.map(value => firstId(value)).filter(Boolean) : undefined
         };
