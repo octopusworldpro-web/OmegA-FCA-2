@@ -91,3 +91,16 @@ test("maps any aborted media request to the stable download-timeout error", asyn
     })
   }), error => error.code === "FCA_ATTACHMENT_DOWNLOAD_TIMEOUT");
 });
+
+
+test("classifies GIF, MP4 and ID3 audio by file signatures", async () => {
+  const gif = await readAttachmentInput(Buffer.from("GIF89a" + "payload"), { maxBytes: 1024 });
+  assert.equal(gif.mimeType, "image/gif");
+  assert.equal(gif.kind, "image");
+  const mp4 = await readAttachmentInput(Buffer.from([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0]), { maxBytes: 1024 });
+  assert.equal(mp4.mimeType, "video/mp4");
+  assert.equal(mp4.kind, "video");
+  const mp3 = await readAttachmentInput(Buffer.from("ID3" + "audio"), { maxBytes: 1024 });
+  assert.equal(mp3.mimeType, "audio/mpeg");
+  assert.equal(mp3.kind, "audio");
+});
