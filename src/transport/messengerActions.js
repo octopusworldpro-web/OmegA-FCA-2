@@ -40,6 +40,34 @@ function createMessengerSendMessageRequest(input = {}) {
     sync_group: 1, text: message?.sticker ? null : body, initiating_source: 1, skip_url_preview_gen: 0
   };
   if (message?.sticker) taskPayload.sticker_id = String(message.sticker);
+  if (message?.emoji != null) {
+    if (typeof message.emoji !== "string" || !message.emoji || message.emoji.length > 32) {
+      throw new TypeError("emoji must be a non-empty string up to 32 characters");
+    }
+    const sizes = { small: 1, medium: 2, large: 3 };
+    const rawSize = message.emojiSize ?? "small";
+    const size = typeof rawSize === "number" ? rawSize : sizes[rawSize];
+    if (!Number.isInteger(size) || size < 1 || size > 3) throw new TypeError("emojiSize must be 1, 2, 3, small, medium, or large");
+    taskPayload.text = message.emoji;
+    taskPayload.hot_emoji_size = size;
+  }
+  if (message?.location != null) {
+    const location = message.location;
+    if (!location || typeof location !== "object" || Array.isArray(location)) throw new TypeError("location must be an object");
+    const latitude = Number(location.latitude);
+    const longitude = Number(location.longitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      throw new TypeError("location latitude/longitude are out of range");
+    }
+    if (location.current !== undefined && typeof location.current !== "boolean") throw new TypeError("location.current must be a boolean");
+    if (location.live !== undefined && typeof location.live !== "boolean") throw new TypeError("location.live must be a boolean");
+    taskPayload.location_data = {
+      coordinates: { latitude, longitude },
+      is_current_location: Boolean(location.current),
+      is_live_location: Boolean(location.live)
+    };
+  }
   if (input.replyToMessageID != null) {
     const replyTo = String(input.replyToMessageID);
     if (!replyTo || replyTo.length > 256) throw new TypeError("replyToMessageID is invalid");
