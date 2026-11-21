@@ -252,7 +252,7 @@ async function createFacebookMqttDriver({
       } else form.thread_fbid = threadID;
       if (input.replyToMessageID != null) form.replied_to_message_id = String(input.replyToMessageID);
       if (hasFiles) {
-        const uploaded = await uploadAttachments(message.attachment);
+        uploadedAttachments = await uploadAttachments(message.attachment);
         const grouped = { image_id: "image_ids", gif_id: "gif_ids", video_id: "video_ids", audio_id: "audio_ids", file_id: "file_ids" };
         const positions = Object.create(null);
         for (const item of uploadedAttachments) {
