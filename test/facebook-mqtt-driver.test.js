@@ -338,3 +338,65 @@ test("creates the GoatBot humanizer when listen starts and exposes getHumanizer"
     await driver.disconnect();
   }
 });
+
+
+test("uploads, sends, downloads and forwards Messenger attachments through bounded native helpers", async () => {
+  const socket = new FakeWebSocket();
+  const seen = [];
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+  const jsonResponse = value => new Response("for (;;);" + JSON.stringify(value), {
+    status: 200, headers: { "content-type": "application/json" }
+  });
+  const fetchImpl = async (input, init = {}) => {
+    const url = new URL(String(input));
+    if (url.hostname === "www.facebook.com" && url.pathname === "/") return htmlResponse();
+    if (url.hostname === "upload.facebook.com" && url.pathname.endsWith("/upload.php")) {
+      const fields = Array.from(init.body.entries()).map(([name]) => name);
+      seen.push({ kind: "upload", fields });
+      return jsonResponse({ payload: { metadata: [{ image_id: "987654321", filetype: "image/png" }] } });
+    }
+    if (url.hostname === "www.facebook.com" && url.pathname === "/messaging/send/") {
+      const form = new URLSearchParams(init.body);
+      seen.push({ kind: "send", imageID: form.get("image_ids[0]"), body: form.get("body"), reply: form.get("replied_to_message_id") });
+      return jsonResponse({ payload: { actions: [{ thread_fbid: "123456789012345", message_id: "mid-attachment", timestamp: 1700000000000 }] } });
+    }
+    if (url.hostname === "www.facebook.com" && url.pathname === "/mercury/attachments/forward/") {
+      const form = new URLSearchParams(init.body);
+      seen.push({ kind: "forward", id: form.get("attachment_id"), recipients: [...form.entries()].filter(([key]) => key.startsWith("recipient_map[")) });
+      return jsonResponse({ payload: { success: true } });
+    }
+    if (url.hostname === "scontent.xx.fbcdn.net") return new Response(Buffer.from("media-bytes"), { status: 200, headers: { "content-type": "image/png" } });
+    throw new Error("Unexpected test URL: " + url.href);
+  };
+  const driver = await createFacebookMqttDriver({
+    appState, fetchImpl, socketFactory: () => socket, mqtt: { keepAlive: 0 }
+  });
+  try {
+    const sent = await driver.sendMessage({
+      threadID: "123456789012345",
+      message: { body: "photo caption", attachment: png },
+      replyToMessageID: "mid-reply"
+    });
+    assert.equal(sent.messageID, "mid-attachment");
+    assert.equal(sent.attachments[0].attachmentID, "987654321");
+    assert.deepEqual(seen.find(item => item.kind === "upload").fields.slice(0, 3), ["voice_clip", "upload_0", "av"]);
+    assert.deepEqual(seen.find(item => item.kind === "send"), {
+      kind: "send", imageID: "987654321", body: "photo caption", reply: "mid-reply"
+    });
+
+    const uploaded = await driver.uploadAttachment(png);
+    assert.equal(uploaded[0].type, "image");
+    assert.equal(uploaded[0].attachmentID, "987654321");
+
+    const downloaded = await driver.downloadAttachment("https://scontent.xx.fbcdn.net/photo.png");
+    assert.equal(downloaded.buffer.toString(), "media-bytes");
+    assert.equal(downloaded.mimeType, "image/png");
+
+    const forwarded = await driver.forwardAttachment("987654321", ["111111111111111", "222222222222222"]);
+    assert.equal(forwarded.success, true);
+    assert.equal(seen.find(item => item.kind === "forward").id, "987654321");
+    assert.equal(seen.find(item => item.kind === "forward").recipients.length, 2);
+  } finally {
+    await driver.disconnect();
+  }
+});
