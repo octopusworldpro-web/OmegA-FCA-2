@@ -38,3 +38,34 @@ test("offline IDs are numeric and input validation is strict", () => {
   assert.throws(() => createMessengerSendMessageRequest({ threadID: "bad", message: "x" }), /numeric Facebook ID/);
   assert.throws(() => createMessengerSendMessageRequest({ threadID: "123456789", message: "x".repeat(20001) }), /exceeds/);
 });
+
+test("builds Messenger location and emoji-size task payloads", () => {
+  const locationRequest = createMessengerSendMessageRequest({
+    threadID: "123456789",
+    message: { location: { latitude: 23.8, longitude: 90.4, current: true, live: false } },
+    timestamp: 1700000000000,
+    otid: "1700000000000123",
+    epochId: "1700000000000456"
+  });
+  const location = JSON.parse(JSON.parse(locationRequest.payload).tasks[0].payload);
+  assert.deepEqual(location.location_data, {
+    coordinates: { latitude: 23.8, longitude: 90.4 },
+    is_current_location: true,
+    is_live_location: false
+  });
+
+  const emojiRequest = createMessengerSendMessageRequest({
+    threadID: "123456789",
+    message: { emoji: "👍", emojiSize: "large" },
+    timestamp: 1700000000000,
+    otid: "1700000000000123",
+    epochId: "1700000000000456"
+  });
+  const emoji = JSON.parse(JSON.parse(emojiRequest.payload).tasks[0].payload);
+  assert.equal(emoji.text, "👍");
+  assert.equal(emoji.hot_emoji_size, 3);
+  assert.throws(() => createMessengerSendMessageRequest({
+    threadID: "123456789", message: { location: { latitude: 91, longitude: 0 } }
+  }), /out of range/);
+});
+
