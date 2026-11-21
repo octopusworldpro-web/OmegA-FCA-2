@@ -1,6 +1,6 @@
 "use strict";
 
-const { randomInt } = require("node:crypto");
+const { randomInt, randomUUID } = require("node:crypto");
 const { offlineThreadingId } = require("./messengerActions");
 const { createFacebookWebClient } = require("../auth/facebookWebClient");
 const { createFacebookError } = require("../auth/facebookResponse");
@@ -520,6 +520,82 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function setPostReaction(postID, type, callback) {
+    let reaction = type;
+    let done = callback;
+    if (typeof reaction === "function") { done = reaction; reaction = 0; }
+    const post = id(postID, "postID");
+    const map = { unlike: 0, like: 1, heart: 2, wow: 3, haha: 4, sad: 7, angry: 8, love: 16 };
+    if (typeof reaction === "string") reaction = map[reaction.toLowerCase()];
+    if (!Number.isInteger(reaction) || ![0, 1, 2, 3, 4, 7, 8, 16].includes(reaction)) {
+      throw new TypeError("setPostReaction: invalid reaction type");
+    }
+    const form = {
+      av: session.userId,
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "CometUFIFeedbackReactMutation",
+      doc_id: "4769042373179384",
+      variables: JSON.stringify({
+        input: {
+          actor_id: session.userId,
+          feedback_id: Buffer.from("feedback:" + post).toString("base64"),
+          feedback_reaction: reaction,
+          feedback_source: "OBJECT",
+          is_tracking_encrypted: true,
+          tracking: [],
+          session_id: randomUUID(),
+          client_mutation_id: String(randomInt(0, 20))
+        },
+        useDefaultActor: false,
+        scale: 3
+      })
+    };
+    const operation = web.post(GRAPHQL_URL, form).then(result => {
+      const feedback = result?.payload?.data?.feedback_react?.feedback;
+      if (!feedback || result.payload.errors?.length) {
+        throw createFacebookError("setPostReaction: Facebook rejected the post reaction", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return {
+        viewer_feedback_reaction_info: feedback.viewer_feedback_reaction_info ?? null,
+        supported_reactions: feedback.supported_reactions ?? [],
+        top_reactions: feedback.top_reactions?.edges ?? [],
+        reaction_count: feedback.reaction_count ?? 0
+      };
+    });
+    return callbackResult(operation, done);
+  }
+
+  function reactToPost(postID, type, callback) {
+    return setPostReaction(postID, type, callback);
+  }
+
+  function reactToComment(commentID, type, callback) {
+    return setPostReaction(commentID, type, callback);
+  }
+
+  function handleFriendRequest(userID, accept, callback) {
+    id(userID, "userID");
+    if (typeof accept !== "boolean") throw new TypeError("accept must be a boolean");
+    const form = {
+      viewer_id: session.userId,
+      "frefs[0]": "jwl",
+      floc: "friend_center_requests",
+      ref: "/reqs.php",
+      action: accept ? "confirm" : "reject"
+    };
+    const operation = web.post("https://www.facebook.com/requests/friends/ajax/", form).then(result => {
+      if (!result?.payload || result.payload.error || result.payload.errors?.length) {
+        throw createFacebookError("handleFriendRequest: Facebook rejected the friend request action", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
   function setTitle(newTitle, threadID, callback) {
     if (typeof newTitle !== "string" || newTitle.length > 100) throw new TypeError("newTitle must be a string up to 100 characters");
     const thread = id(threadID, "threadID");
@@ -968,7 +1044,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
   }
 
   return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
-    addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeBlockedStatus, changeBio, unfriend, getEmojiUrl, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
+    addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeBlockedStatus, changeBio, unfriend, getEmojiUrl, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, setPostReaction, reactToPost, reactToComment, handleFriendRequest, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
 module.exports = { createFacebookThreadApi, DOC_IDS };

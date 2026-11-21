@@ -494,3 +494,35 @@ test("getThreadHistory paginates legacy requests above one GraphQL page", async 
   assert.equal(calls[1].message_limit, 2);
 });
 
+test("post/comment reactions and friend-request decisions use validated FCA requests", async () => {
+  const calls = [];
+  const feedback = {
+    viewer_feedback_reaction_info: { reaction: "LIKE" },
+    supported_reactions: [{ reaction: "LIKE" }],
+    top_reactions: { edges: [{ reaction: "LIKE", count: 1 }] },
+    reaction_count: 1
+  };
+  const api = createFacebookThreadApi({ session, webClient: { post: async (url, body) => {
+    calls.push({ url, body });
+    if (url === "https://www.facebook.com/api/graphql/") {
+      return { payload: { data: { feedback_react: { feedback } } } };
+    }
+    return { payload: { success: true } };
+  } } });
+  await api.setPostReaction("987654321", "like");
+  await api.reactToPost("987654321", "love");
+  await api.reactToComment("987654321", "haha");
+  await api.handleFriendRequest("987654321", true);
+  assert.equal(calls.length, 4);
+  const first = JSON.parse(calls[0].body.variables);
+  assert.equal(calls[0].body.doc_id, "4769042373179384");
+  assert.equal(first.input.feedback_id, Buffer.from("feedback:987654321").toString("base64"));
+  assert.equal(first.input.feedback_reaction, 1);
+  assert.equal(JSON.parse(calls[1].body.variables).input.feedback_reaction, 16);
+  assert.equal(JSON.parse(calls[2].body.variables).input.feedback_reaction, 4);
+  assert.equal(calls[3].url, "https://www.facebook.com/requests/friends/ajax/");
+  assert.equal(calls[3].body.action, "confirm");
+  await assert.rejects(api.setPostReaction("987654321", "unknown"), /invalid reaction type/);
+  assert.throws(() => api.handleFriendRequest("987654321", "yes"), /accept must be a boolean/);
+});
+

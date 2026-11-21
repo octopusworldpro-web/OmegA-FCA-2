@@ -26,7 +26,7 @@ function createFcaClient(api) {
     ["sendImage"], ["sendVideo"], ["sendAudio"], ["sendFile"], ["sendGif"],
     ["sendLocation"], ["shareLink"], ["shareContact"],
     ["editMessage", "edit"], ["unsendMessage", "unsend"], ["deleteMessage", "delete"],
-    ["setMessageReaction", "react"], ["getMessage", "get"],
+    ["setMessageReaction", "react"], ["setPostReaction", "reactToPost"], ["reactToComment"], ["getMessage", "get"],
     ["uploadAttachment", "upload"], ["downloadAttachment", "download"],
     ["forwardAttachment", "forward"], ["sendTypingIndicator", "typing"],
     ["markAsRead"], ["markAsReadAll"], ["markAsDelivered"], ["markAsSeen"]
