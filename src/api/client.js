@@ -237,7 +237,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
 
       facade.sendImage = (image, threadID, caption, callback) => {
         const parsed = parseCaptionCallback(caption, callback);
-        const message = typeof image === "string" && /^https?:\\/\\//i.test(image)
+        const message = typeof image === "string" && (image.startsWith("https://") || image.startsWith("http://"))
           ? { body: String(parsed.caption), url: image }
           : mediaPayload(image, parsed.caption);
         return sendCompatibilityPayload(message, threadID, parsed.callback);
@@ -256,14 +256,14 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       };
       facade.sendGif = (gif, threadID, caption, callback) => {
         const parsed = parseCaptionCallback(caption, callback);
-        const message = typeof gif === "string" && /^https?:\\/\\//i.test(gif)
+        const message = typeof gif === "string" && (gif.startsWith("https://") || gif.startsWith("http://"))
           ? { body: String(parsed.caption), url: gif }
           : mediaPayload(gif, parsed.caption);
         return sendCompatibilityPayload(message, threadID, parsed.callback);
       };
       facade.shareLink = (url, threadID, caption, callback) => {
         const parsed = parseCaptionCallback(caption, callback);
-        if (typeof url !== "string" || !/^https?:\\/\\//i.test(url)) throw new TypeError("shareLink URL must use HTTP or HTTPS");
+        if (typeof url !== "string" || !(url.startsWith("https://") || url.startsWith("http://"))) throw new TypeError("shareLink URL must use HTTP or HTTPS");
         return sendCompatibilityPayload({ body: String(parsed.caption), url }, threadID, parsed.callback);
       };
       facade.sendLocation = (latitude, longitude, threadID, callback) => {
