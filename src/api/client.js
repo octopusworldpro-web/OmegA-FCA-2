@@ -7,7 +7,7 @@ const { validateTransportDriver } = require("../transport/contract");
 const { classifySessionState } = require("../security/sessionState");
 
 const METHOD_FEATURES = Object.freeze({
-  sendRequest: "messaging", sendMessage: "messaging", sendBroadcast: "messaging", connectE2EE: "e2ee", _connectE2EEAndMerge: "e2ee", disconnectE2EE: "e2ee", sendE2EEMessage: "e2ee", sendE2EEAttachment: "e2ee", downloadE2EEAttachment: "e2ee", isE2EEThread: "e2ee", getE2EEStatus: "e2ee", editMessage: "messaging",
+  sendRequest: "messaging", sendMessage: "messaging", sendBroadcast: "messaging", connectE2EE: "e2ee", _connectE2EEAndMerge: "e2ee", disconnectE2EE: "e2ee", listenE2EE: "e2ee", sendE2EEMessage: "e2ee", sendE2EEReaction: "e2ee", editE2EEMessage: "e2ee", unsendE2EEMessage: "e2ee", sendE2EETyping: "e2ee", sendE2EEAttachment: "e2ee", downloadE2EEAttachment: "e2ee", isE2EEThread: "e2ee", getE2EEStatus: "e2ee", editMessage: "messaging",
   shareContact: "messaging", uploadAttachment: "messaging", downloadAttachment: "messaging", forwardAttachment: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
   markAsDelivered: "messaging", markAsReadAll: "messaging", markAsSeen: "messaging", deleteMessage: "messaging", deleteThread: "threads", muteThread: "threads", changeArchivedStatus: "threads", sendTypingIndicator: "messaging",
   getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
@@ -21,7 +21,7 @@ const METHOD_FEATURES = Object.freeze({
 });
 
 const DRIVER_METHODS = [
-  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "httpPostFormData", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "saveSession", "restoreSessionBackup", "setOptions",
+  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "listenE2EE", "sendE2EEMessage", "sendE2EEReaction", "editE2EEMessage", "unsendE2EEMessage", "sendE2EETyping", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "httpPostFormData", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "saveSession", "restoreSessionBackup", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "setPostReaction", "reactToPost", "reactToComment", "handleFriendRequest", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeBlockedStatus", "changeBio", "unfriend", "getEmojiUrl", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl", "pinMessage", "unpinMessage", "sendFriendRequest", "followUser", "unfollowUser", "postComment", "sharePost"
@@ -366,7 +366,12 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
         isThread: typeof facade.isE2EEThread === "function" ? facade.isE2EEThread : undefined,
         sendMessage: typeof facade.sendE2EEMessage === "function" ? facade.sendE2EEMessage : undefined,
         sendAttachment: typeof facade.sendE2EEAttachment === "function" ? facade.sendE2EEAttachment : undefined,
-        downloadAttachment: typeof facade.downloadE2EEAttachment === "function" ? facade.downloadE2EEAttachment : undefined
+        downloadAttachment: typeof facade.downloadE2EEAttachment === "function" ? facade.downloadE2EEAttachment : undefined,
+        listen: typeof facade.listenE2EE === "function" ? facade.listenE2EE : undefined,
+        sendReaction: typeof facade.sendE2EEReaction === "function" ? facade.sendE2EEReaction : undefined,
+        editMessage: typeof facade.editE2EEMessage === "function" ? facade.editE2EEMessage : undefined,
+        unsendMessage: typeof facade.unsendE2EEMessage === "function" ? facade.unsendE2EEMessage : undefined,
+        sendTyping: typeof facade.sendE2EETyping === "function" ? facade.sendE2EETyping : undefined
       });
     }
     const externalMethods = new Map();
