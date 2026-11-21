@@ -729,6 +729,13 @@ async function createFacebookMqttDriver({
         return Object.freeze({ ...paths, saveNow: guard.saveNow });
       },
       stopSessionGuard,
+      disconnectE2EE: () => {
+        if (!e2eeClient) return false;
+        const client = e2eeClient;
+        e2eeClient = null;
+        client.disconnect();
+        return true;
+      },
       disconnect: async () => {
         if (closed) return;
         closed = true;

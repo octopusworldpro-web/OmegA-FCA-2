@@ -343,3 +343,37 @@ test("FCA API exposes logout with Promise and callback forms", async () => {
   assert.equal(client.getConnectionState().state, "idle");
 });
 
+test("FCA API exposes E2EE namespace and legacy group creation alias", async () => {
+  const calls = [];
+  let connected = false;
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      getE2EEStatus: () => ({ connected, deviceId: 1, persistentStorage: false, storageEncrypted: false }),
+      connectE2EE: async () => { connected = true; return { userId: "123456", deviceId: 1 }; },
+      disconnectE2EE: () => { connected = false; return true; },
+      isE2EEThread: id => id === "987654321",
+      sendE2EEMessage: async (...args) => { calls.push(["send", ...args]); return "encrypted"; },
+      createNewGroup: async (...args) => { calls.push(["group", ...args]); return "555555555"; },
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  assert.equal(api.e2ee.isConnected(), false);
+  await api.e2ee.connect();
+  assert.equal(api.e2ee.isConnected(), true);
+  assert.equal(api.e2ee.isThread("987654321"), true);
+  assert.equal(await api.e2ee.sendMessage("987654321", "secret"), "encrypted");
+  assert.equal(await api.createGroup("Test Group", ["111111111", "222222222"]), "555555555");
+  assert.deepEqual(calls[0], ["send", "987654321", "secret"]);
+  assert.deepEqual(calls[1], ["group", ["111111111", "222222222"], "Test Group", undefined]);
+  assert.equal(api.e2ee.disconnect(), true);
+  assert.equal(api.e2ee.isConnected(), false);
+  await client.logout();
+});
+

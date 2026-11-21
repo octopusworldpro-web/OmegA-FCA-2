@@ -7,7 +7,7 @@ const { validateTransportDriver } = require("../transport/contract");
 const { classifySessionState } = require("../security/sessionState");
 
 const METHOD_FEATURES = Object.freeze({
-  sendRequest: "messaging", sendMessage: "messaging", sendBroadcast: "messaging", connectE2EE: "e2ee", _connectE2EEAndMerge: "e2ee", sendE2EEMessage: "e2ee", sendE2EEAttachment: "e2ee", downloadE2EEAttachment: "e2ee", isE2EEThread: "e2ee", getE2EEStatus: "e2ee", editMessage: "messaging",
+  sendRequest: "messaging", sendMessage: "messaging", sendBroadcast: "messaging", connectE2EE: "e2ee", _connectE2EEAndMerge: "e2ee", disconnectE2EE: "e2ee", sendE2EEMessage: "e2ee", sendE2EEAttachment: "e2ee", downloadE2EEAttachment: "e2ee", isE2EEThread: "e2ee", getE2EEStatus: "e2ee", editMessage: "messaging",
   shareContact: "messaging", uploadAttachment: "messaging", downloadAttachment: "messaging", forwardAttachment: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
   markAsDelivered: "messaging", markAsReadAll: "messaging", markAsSeen: "messaging", deleteMessage: "messaging", deleteThread: "threads", muteThread: "threads", changeArchivedStatus: "threads", sendTypingIndicator: "messaging",
   getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
@@ -20,7 +20,7 @@ const METHOD_FEATURES = Object.freeze({
 });
 
 const DRIVER_METHODS = [
-  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
+  "sendRequest", "sendMessage", "sendBroadcast", "connectE2EE", "_connectE2EEAndMerge", "disconnectE2EE", "sendE2EEMessage", "sendE2EEAttachment", "downloadE2EEAttachment", "isE2EEThread", "getE2EEStatus", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeBlockedStatus", "changeBio", "unfriend", "getEmojiUrl", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
@@ -337,6 +337,22 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       sessionGuard: typeof driver.sessionGuard === "function",
       e2ee: typeof driver.connectE2EE === "function" && typeof driver.sendE2EEMessage === "function"
     });
+    if (typeof driver.createNewGroup === "function") {
+      facade.createGroup = (groupTitle, participantIDs, callback) =>
+        facade.createNewGroup(participantIDs, groupTitle, callback);
+    }
+    if (typeof driver.getE2EEStatus === "function") {
+      facade.e2ee = Object.freeze({
+        connect: typeof facade.connectE2EE === "function" ? facade.connectE2EE : undefined,
+        disconnect: typeof facade.disconnectE2EE === "function" ? facade.disconnectE2EE : undefined,
+        isConnected: () => Boolean(driver.getE2EEStatus().connected),
+        getStatus: () => driver.getE2EEStatus(),
+        isThread: typeof facade.isE2EEThread === "function" ? facade.isE2EEThread : undefined,
+        sendMessage: typeof facade.sendE2EEMessage === "function" ? facade.sendE2EEMessage : undefined,
+        sendAttachment: typeof facade.sendE2EEAttachment === "function" ? facade.sendE2EEAttachment : undefined,
+        downloadAttachment: typeof facade.downloadE2EEAttachment === "function" ? facade.downloadE2EEAttachment : undefined
+      });
+    }
     facade.logout = callback => logout(callback);
     facade.getConnectionState = () => supervisor.snapshot();
     facade.getLicense = () => verifiedLicense;

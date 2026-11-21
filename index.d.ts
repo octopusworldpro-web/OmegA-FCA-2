@@ -92,7 +92,7 @@ export interface TransportDriver {
   sendE2EEMessage?(threadID: string | number, message: string | { body?: string; attachment?: AttachmentInput }, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   sendE2EEAttachment?(threadID: string | number, attachment: AttachmentInput, caption?: string, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   downloadE2EEAttachment?(attachment: Record<string, unknown>, callback?: (error: Error | null, buffer?: Buffer) => void): Promise<Buffer> | void;
-  isE2EEThread?(threadID: string | number): boolean;
+  isE2EEThread?(threadID: string | number): boolean; disconnectE2EE?(): boolean;
   getE2EEStatus?(): E2EEStatus;
   listen(callback: (error: Error | null, event?: unknown) => void): (() => void) | void;
   disconnect?(): void | Promise<void>; getCurrentUserID?(): string | number | null | Promise<string | number | null>; getAppState?(): Cookie[] | Promise<Cookie[]>; getCookies?(): string | Promise<string>; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; refreshFb_dtsg?(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>;
@@ -132,6 +132,9 @@ export interface ClientApi {
   getE2EEStatus?(): E2EEStatus;
   getCurrentUserID(): string | null; getCookies?(): string; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; getAppState?(): Cookie[]; getUserID?(): string | null; getUserID?(name: string, callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; getUID?(input: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; resolvePhotoUrl?(photoID: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getFriendsList?(callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; createNewGroup?(participantIDs: Array<string | number>, groupTitle?: string | ((error: Error | null, result?: string) => void) | null, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getConnectionState(): ConnectionSnapshot; getLicense(): VerifiedLicense | null;
   getCapabilities(): Readonly<{ methods: readonly string[]; events: boolean; sessionGuard: boolean; e2ee: boolean }>;
+  logout?(callback?: (error?: Error | null) => void): Promise<void> | void;
+  createGroup?(groupTitle: string | null, participantIDs: Array<string | number>, callback?: (error: Error | null, threadID?: string) => void): Promise<string> | void;
+  e2ee?: Readonly<{ connect?: (...args: any[]) => any; disconnect?: () => boolean; isConnected(): boolean; getStatus(): E2EEStatus; isThread?: (threadID: string | number) => boolean; sendMessage?: (...args: any[]) => any; sendAttachment?: (...args: any[]) => any; downloadAttachment?: (...args: any[]) => any }>;
   listen(callback: (event: unknown) => void): () => void;
   listenMqtt(callback: (error: Error | null, event?: unknown) => void): () => void;
   stopListening(callback?: () => void): boolean;

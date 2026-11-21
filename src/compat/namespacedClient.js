@@ -36,7 +36,7 @@ function createFcaClient(api) {
     ["getThreadHistory", "getHistory"], ["deleteThread", "delete"],
     ["muteThread", "mute"], ["changeArchivedStatus", "archive"],
     ["handleMessageRequest", "handleRequest"], ["searchForThread", "search"],
-    ["getThreadPictures", "getPictures"], ["createNewGroup", "createGroup"],
+    ["getThreadPictures", "getPictures"], ["createGroup", "createGroup"],
     ["setTitle"], ["changeThreadColor", "changeColor"],
     ["changeThreadEmoji", "changeEmoji"], ["changeNickname"],
     ["changeGroupImage", "changeImage"], ["changeAdminStatus"], ["createPoll"]
