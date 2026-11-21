@@ -189,7 +189,8 @@ async function createFacebookMqttDriver({
       form.append("voice_clip", "false");
       files.forEach((file, index) => form.append("upload_" + index, new Blob([file.buffer], { type: file.mimeType }), file.fileName));
       const response = await webClient.postMultipart("https://upload.facebook.com/ajax/mercury/upload.php", form);
-      const metadata = response?.payload?.metadata;
+      const uploadPayload = response?.payload?.payload ?? response?.payload;
+      const metadata = uploadPayload?.metadata;
       const entries = Array.isArray(metadata) ? metadata :
         (metadata && typeof metadata === "object" ? Object.keys(metadata).sort((a,b) => Number(a)-Number(b)).map(key => metadata[key]) : []);
       if (entries.length !== files.length) {
