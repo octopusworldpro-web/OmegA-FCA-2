@@ -46,11 +46,15 @@ test("Messenger protocol sends /ls_req and correlates the matching /ls_resp", as
   assert.equal(config.protocol.getPendingRequestCount(), 0);
 });
 
-test("rejects malformed request input and bounds pending requests", async () => {
+test("rejects malformed request input and bounds pending requests before publishing", async () => {
   const config = createFacebookMqttProtocol({ userId: "123456789", maxPendingRequests: 1, requestTimeoutMs: 100 });
-  const socket = { send() {} };
+  const sent = [];
+  const socket = { send(frame) { sent.push(Buffer.from(frame)); } };
   const pending = config.protocol.request(socket, { type: 3 });
+  assert.equal(sent.length, 1);
   await assert.rejects(config.protocol.request(socket, { type: 3 }), /pending request limit/);
+  await assert.rejects(config.protocol.request(socket, { type: 3 }, { timeoutMs: 0 }), /request timeout is invalid/);
+  assert.equal(sent.length, 1, "rejected requests must not reach the broker");
   config.protocol.closeRequests(new Error("test cleanup"));
   await assert.rejects(pending, /test cleanup/);
 });
