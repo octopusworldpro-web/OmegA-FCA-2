@@ -107,3 +107,15 @@ This is a native code-path integration milestone, not live acceptance. The
 Facebook-specific MQTT handshake, task schemas, event deltas, and private web
 action endpoints remain experimental until an authorized live account test
 proves login readiness, message receive/send, and recovery.
+
+
+## E2EE support (2026-11-21)
+
+| API / behavior | Status | Notes |
+|---|---|---|
+| `connectE2EE`, `_connectE2EEAndMerge` | Implemented in driver | Separate Noise E2EE socket, device registration and prekey sync; live Meta acceptance pending. |
+| `sendE2EEMessage`, `sendMessage(..., { e2ee: "required" })` | Implemented for one-to-one path | Per-device Signal-style sessions; explicit required mode fails closed and does not fall back to plaintext. |
+| E2EE media send/download | Implemented for one-to-one path | Encrypted media, ciphertext hash and HMAC verification; live upload/download acceptance pending. |
+| E2EE incoming events | Implemented in listener integration | Message, edit, reaction and revoke events merge into `listen`/`listenMqtt`. |
+| Persistent device state | Implemented | AES-256-GCM encrypted file; explicit 32-byte key required for persistent storage. |
+| Group Sender Keys/SKDM, Labyrinth backup, E2EE calls | Not implemented | Not advertised as supported. |
