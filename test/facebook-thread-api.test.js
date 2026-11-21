@@ -562,3 +562,37 @@ test("read-all, seen and unsend receipt failures reach legacy callbacks", async 
     assert.equal(error?.retryable, false);
   }
 });
+
+test("friend request, follow/unfollow and postComment use validated Comet mutations", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({ session, webClient: { post: async (url, body) => {
+    calls.push({ url, body });
+    if (body.fb_api_req_friendly_name === "FriendingCometFriendRequestSendMutation") {
+      return { payload: { data: { friend_request_send: { friend_requestees: [{
+        id: "987654321", friendship_status: "OUTGOING_REQUEST", profile_action: { title: { text: "Requested" } }
+      }] } } } };
+    }
+    if (body.fb_api_req_friendly_name === "useCometUFICreateCommentMutation") {
+      return { payload: { data: { comment_create: {
+        feedback_comment_edge: { node: { id: "comment.1", feedback: { url: "https://facebook.com/post/1" } } },
+        feedback: { total_comment_count: 3 }
+      } } } };
+    }
+    return { payload: { data: { success: true } } };
+  } } });
+  const request = await api.sendFriendRequest("987654321");
+  assert.equal(request.success, true);
+  assert.equal(request.friendshipStatus, "OUTGOING_REQUEST");
+  assert.equal(await api.followUser("987654321"), true);
+  assert.equal(await api.unfollowUser("987654321"), true);
+  const comment = await api.postComment("Nice post!", "post.1");
+  assert.deepEqual(comment, { id: "comment.1", url: "https://facebook.com/post/1", count: 3 });
+  assert.equal(calls[0].body.doc_id, "24614631718227645");
+  assert.equal(calls[1].body.doc_id, "25472099855769847");
+  assert.equal(calls[2].body.fb_api_req_friendly_name, "CometUserUnfollowMutation");
+  assert.equal(calls[3].body.doc_id, "6993516810709754");
+  const commentVariables = JSON.parse(calls[3].body.variables);
+  assert.equal(commentVariables.input.feedback_id, Buffer.from("feedback:post.1").toString("base64"));
+  await assert.rejects(api.postComment("", "post.1"), /non-empty string/);
+  assert.throws(() => api.followUser("bad"), /numeric Facebook ID/);
+});
