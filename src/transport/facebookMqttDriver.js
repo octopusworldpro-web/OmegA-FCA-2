@@ -298,6 +298,19 @@ async function createFacebookMqttDriver({
       return callE2EE("downloadMedia", [attachment]);
     }
 
+    async function sendE2EEReaction(threadID, messageID, reaction) {
+      return callE2EE("sendReaction", [String(threadID), String(messageID), String(reaction)], 3);
+    }
+    async function editE2EEMessage(threadID, messageID, newText) {
+      return callE2EE("editMessage", [String(threadID), String(messageID), String(newText)], 3);
+    }
+    async function unsendE2EEMessage(threadID, messageID) {
+      return callE2EE("unsendMessage", [String(threadID), String(messageID)], 2);
+    }
+    async function sendE2EETyping(threadID, isTyping = true) {
+      return callE2EE("sendTyping", [String(threadID), isTyping !== false], 2);
+    }
+
     const stopSessionGuard = async () => {
       if (!guard) return false;
       const active = guard;
@@ -500,6 +513,11 @@ async function createFacebookMqttDriver({
       ...driver,
       ...threadApi,
       sendBroadcast,
+      listenE2EE: callback => {
+        if (typeof callback !== "function") throw new TypeError("E2EE listener callback is required");
+        e2eeListeners.add(callback);
+        return () => e2eeListeners.delete(callback);
+      },
       listen: callback => {
         if (typeof callback !== "function") throw new TypeError("listener callback is required");
         if (!humanizer) humanizer = createHumanizer({
@@ -558,6 +576,18 @@ async function createFacebookMqttDriver({
       },
       downloadE2EEAttachment(attachment, callback) {
         return callbackResult(downloadE2EEAttachment(attachment), callback);
+      },
+      sendE2EEReaction(threadID, messageID, reaction, callback) {
+        return callbackResult(sendE2EEReaction(threadID, messageID, reaction), callback);
+      },
+      editE2EEMessage(threadID, messageID, newText, callback) {
+        return callbackResult(editE2EEMessage(threadID, messageID, newText), callback);
+      },
+      unsendE2EEMessage(threadID, messageID, callback) {
+        return callbackResult(unsendE2EEMessage(threadID, messageID), callback);
+      },
+      sendE2EETyping(threadID, isTyping = true, callback) {
+        return callbackResult(sendE2EETyping(threadID, isTyping), callback);
       },
       isE2EEThread(threadID) {
         return e2eeClient ? e2eeClient.isKnownE2EEThread(String(threadID)) : false;
