@@ -235,8 +235,9 @@ function createFacebookMqttProtocol(options = {}) {
         try {
           socket.send(mqtt.encodePublish({ topic: "/ls_req", payload: JSON.stringify(envelope), qos: 1, packetId: nextPacketId() }));
         } catch (error) {
-          requestTracker.rejectAll(error);
-          throw error;
+          // A single failed publish must not cancel unrelated in-flight
+          // message/edit requests sharing this MQTT connection.
+          requestTracker.reject(requestId, error);
         }
         return responsePromise;
       },
