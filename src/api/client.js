@@ -11,7 +11,7 @@ const METHOD_FEATURES = Object.freeze({
   shareContact: "messaging", uploadAttachment: "messaging", downloadAttachment: "messaging", forwardAttachment: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
   markAsDelivered: "messaging", markAsReadAll: "messaging", markAsSeen: "messaging", deleteMessage: "messaging", deleteThread: "threads", muteThread: "threads", changeArchivedStatus: "threads", sendTypingIndicator: "messaging",
   getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
-  getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads",
+  getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads", getThreadPictures: "threads", searchForThread: "threads", handleMessageRequest: "threads", changeAdminStatus: "groups", createPoll: "groups",
   getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads",
   createNewGroup: "groups", addUserToGroup: "groups", removeUserFromGroup: "groups",
   changeNickname: "groups", changeGroupImage: "groups", changeAvatar: "groups",
@@ -22,7 +22,7 @@ const METHOD_FEATURES = Object.freeze({
 const DRIVER_METHODS = [
   "sendRequest", "sendMessage", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
-  "changeNickname", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
+  "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
 ];
 
