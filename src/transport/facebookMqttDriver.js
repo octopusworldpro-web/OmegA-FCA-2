@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const fs = require("node:fs");
 const os = require("node:os");
 const { createPersonalSession } = require("../auth/personalSession");
 const { createSessionGuard } = require("../security/sessionGuard");
@@ -539,7 +540,11 @@ async function createFacebookMqttDriver({
         const requested = options.e2ee ?? (loginOptions.e2ee === true ? "required" : "auto");
         const forceE2EE = requested === true || requested === "required";
         const disableE2EE = requested === false || requested === "disabled";
-        const knownE2EE = !disableE2EE && e2eeClient && e2eeClient.isKnownE2EEThread(threadID);
+        const hasSavedE2EEDevice = Boolean(!e2eeClient && e2eeDevicePath && e2eeStorageKey && fs.existsSync(e2eeDevicePath));
+        const knownE2EE = !disableE2EE && (
+          (e2eeClient && e2eeClient.isKnownE2EEThread(threadID)) ||
+          (hasSavedE2EEDevice && getE2EEClient().isKnownE2EEThread(threadID))
+        );
         if (forceE2EE || knownE2EE) {
           return sendE2EEMessage(threadID, message, {
             ...options,
