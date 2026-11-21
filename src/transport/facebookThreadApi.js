@@ -211,7 +211,6 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     const operation = (async () => {
       const result = [];
       let before = timestamp;
-      let firstPage = true;
       let previousCursor = null;
       while (result.length < requestedLimit) {
         const pageSize = Math.min(100, requestedLimit - result.length);
@@ -229,7 +228,6 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
         if (!Number.isSafeInteger(cursor) || cursor < 0 || (previousCursor !== null && cursor >= previousCursor)) break;
         previousCursor = cursor;
         before = cursor;
-        firstPage = false;
       }
       return result;
     })();
@@ -261,6 +259,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
       const result = [];
       let before = timestamp == null ? null : Number(timestamp);
       let previousCursor = null;
+      let firstPage = true;
       while (result.length < requestedAmount) {
         const pageSize = Math.min(100, requestedAmount - result.length);
         const data = await graph({
@@ -270,7 +269,8 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
         const raw = data?.message_thread;
         const nodes = raw?.messages?.nodes;
         if (!Array.isArray(nodes)) throw createFacebookError("getThreadHistory: response is missing messages.nodes", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
-        if (before !== null && nodes.length) nodes.shift();
+        if (!firstPage && nodes.length) nodes.shift();
+        firstPage = false;
         const page = nodes.slice(0, pageSize);
         const isGroup = raw.thread_type === "GROUP";
         result.push(...page.map(message => formatMessage(message, thread, isGroup)).filter(message => message.messageID));
