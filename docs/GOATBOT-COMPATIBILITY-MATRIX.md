@@ -79,17 +79,17 @@ The complete static scan covers all 271 JavaScript files and 28 Eta templates in
 
 Confirmed direct calls include `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, `getCurrentUserID`, `getThreadList`, `getThreadInfo`, `getThreadHistory`, `getUserInfo`, `getUID`, `sendMessage`, `editMessage`, `unsendMessage`, `setMessageReaction`, `markAsRead`, `markAsReadAll`, `markAsSeen`, `markAsDelivered`, `deleteMessage`, `deleteThread`, `muteThread`, `changeArchivedStatus`, `shareContact`, `addUserToGroup`, `removeUserFromGroup`, `changeNickname`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadColor` and `changeThreadEmoji`.
 
-The scan also found remaining mismatches: startup auto-sync passes an unsupported `getThreadList` limit/tag shape; one command requests 1,000 history items where FCA-2 caps the call at 100; some legacy `sendMessage` call sites pass reply IDs in the wrong positional slot; and E2EE is not implemented. Messenger attachment upload/send/download/forward, nested `messageReply`, and `read_receipt` event naming now have source-level implementations. All private Facebook endpoint behavior remains subject to authorized live acceptance.
+The call-site compatibility fixes are now present in FCA-2 `main` (candidate `0.1.6-rc.3`): `getThreadList` accepts the legacy limit/tags forms and pages requests up to a bounded 10,000-thread ceiling; `getThreadHistory` pages up to 1,000 messages; the public `sendMessage` facade accepts the legacy third-position reply ID; and normalized events expose `read_receipt` actor aliases plus nested `messageReply` metadata when supplied by the incoming delta. The native attachment pipeline accepts Buffer, Uint8Array, Blob and Node readable streams, uploads before send, and rejects incomplete upload/send responses. Synthetic regression coverage includes pagination above one page, reply/read normalization, and attachment upload/send; a stream-backed attachment regression is included in the current prerelease CI batch. These source-level compatibility fixes are not available to GoatBot until the candidate is published and its dependency/lockfile are updated. All private Facebook endpoint behavior remains subject to authorized live acceptance.
 
 ## Required work before migration
 
 - Complete live validation of the owner-supplied AppState session; username/password and 2FA login remain deferred, and checkpoint resolution remains manual.
-- Use [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md) as the completed source-level call-site baseline; resolve the remaining thread-list/history and positional-signature mismatches before claiming drop-in compatibility. Attachment and event-shape implementations are documented separately.
-- Add the missing legacy methods and event shapes only when their request contracts and behavior are evidenced; do not return dummy success responses.
+- Source-level thread-list/history pagination, positional reply-ID handling, attachment streams, and event shape adapters are implemented in the `0.1.6-rc.3` candidate. Publish the prerelease and update GoatBot's dependency/lockfile to that exact published version before validating integration against the packaged artifact.
+- Keep unsupported or unverified legacy methods explicit; do not return dummy success responses. Group E2EE Sender Keys, Labyrinth backup/restore, and E2EE calls remain unimplemented.
 - Validate native MQTT frame decoding, event normalization, readiness, reconnect and deterministic shutdown against an authorized account; synthetic fake-broker coverage is not live acceptance.
 - Run the owner-operated `npm run test:messenger-mqtt` check for live readiness and inbound events; use its explicit opt-in send mode only against a thread the owner controls and verify recipient delivery.
-- Run GoatBot's existing secure-session tests and a full startup/contract test against the intended released package before changing the dependency.
-- Verify CI on the latest prerelease head; keep username/password login deferred and preserve all existing Bot credentials/configuration.
+- After the owner publishes the `next` prerelease, pin that exact published version in GoatBot `fca-migration-cleanup`, regenerate `package-lock.json`, then run secure-session, FCA integration, syntax, startup and contract tests.
+- Verify CI on the latest prerelease head; keep username/password login deferred and preserve all existing Bot credentials/configuration. Live AppState acceptance remains a separate owner-operated gate.
 
 ## Release decision
 
