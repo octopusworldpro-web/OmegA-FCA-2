@@ -50,8 +50,8 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 | `getMessage` | Implemented; limited | Resolves from bounded recent thread history; not a dedicated arbitrary-message lookup. |
 | `forwardAttachment` | Implemented; live-unverified | Native authenticated forward path exists. |
 | `uploadAttachment` | Implemented; live-unverified | Bounded file reading, MIME detection and upload metadata validation exist. |
-| `pinMessage` | **Missing** | No matching first-party method found in driver, thread API or client facade. |
-| `unpinMessage` | **Missing** | No matching first-party method found. |
+| `pinMessage` | Implemented; live-unverified | Native Lightspeed task builder and client methods added for pin/unpin; server acceptance still requires an authorized live account. |
+| `unpinMessage` | Implemented; live-unverified | Native Lightspeed task builder and client methods added for pin/unpin; server acceptance still requires an authorized live account. |
 | `markAsRead` | Implemented; live-unverified | Authenticated read action exists. |
 | `markAsReadAll` | Implemented; live-unverified | Authenticated inbox-folder read action exists. |
 | `markAsDelivered` | Implemented; live-unverified | Authenticated delivery receipt action exists. |
