@@ -94,3 +94,39 @@ are unchanged.
 
 OmegA-FCA remains MIT. The E2EE source port is also MIT-licensed; see
 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for the upstream copyright notice.
+
+## One-to-one E2EE controls
+
+The E2EE namespace exposes dedicated encrypted-chat controls after `connectE2EE()`:
+
+```js
+// Subscribe only to events emitted by the E2EE Noise connection.
+const stopE2EE = api.e2ee.listen((error, event) => {
+  if (error) return;
+  console.log(event.type, event.threadID, event.isE2EE);
+});
+
+// Add or remove a reaction (empty string removes it).
+await api.e2ee.sendReaction("RECIPIENT_USER_ID", "MESSAGE_ID", "❤️");
+
+// Edit or unsend a message sent in the encrypted one-to-one chat.
+await api.e2ee.editMessage("RECIPIENT_USER_ID", "MESSAGE_ID", "Corrected text");
+await api.e2ee.unsendMessage("RECIPIENT_USER_ID", "MESSAGE_ID");
+
+// Start / stop the encrypted chat typing state.
+await api.e2ee.sendTyping("RECIPIENT_USER_ID", true);
+await api.e2ee.sendTyping("RECIPIENT_USER_ID", false);
+
+// Stop receiving E2EE-only events.
+stopE2EE();
+```
+
+Equivalent compatibility methods are available as `listenE2EE`,
+`sendE2EEReaction`, `editE2EEMessage`, `unsendE2EEMessage`, and
+`sendE2EETyping` on the API object.
+
+These control methods verify the target thread is a one-to-one conversation before
+sending. Group E2EE Sender Keys are still unsupported and are rejected explicitly;
+they are never silently downgraded to plaintext. Reaction/edit/revoke payloads use
+the encrypted ConsumerApplication path and preserve the edit/revoke message
+attributes. These methods have synthetic payload tests but remain live-unverified.
