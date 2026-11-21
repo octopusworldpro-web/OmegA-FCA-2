@@ -369,7 +369,7 @@ export interface MessengerSyncCursor { syncToken: string | null; lastSeqId: stri
 export interface MessengerSyncParseResult { events: ReadonlyArray<Record<string, unknown>>; envelope: unknown; cursor: MessengerSyncCursor | null; }
 /** Parses known Messenger sync delta envelopes conservatively. */
 export function parseMessengerSyncPayload(input: unknown): MessengerSyncParseResult;
-export function normalizeMessengerDelta(delta: unknown): Record<string, unknown> | null;
+export function normalizeMessengerDelta(delta: unknown): Record<string, unknown> | null;\n/** Normalizes a Messenger attachment into legacy FCA type/url/id fields. */\nexport function normalizeMessengerAttachment(attachment: unknown): Record<string, unknown> | null;
 
 export interface MqttRequestTracker { allocateId(): number; track(requestId: string | number, timeoutMs?: number): Promise<unknown>; resolve(response: unknown): boolean; rejectAll(reason?: unknown): void; readonly pendingCount: number; }
 export function createMqttRequestTracker(options?: { timeoutMs?: number; maxPending?: number; initialRequestId?: number }): MqttRequestTracker;
