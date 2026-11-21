@@ -160,14 +160,14 @@ function createMessengerPinMessageRequest(input = {}) {
   const threadID = String(input.threadID ?? "");
   const messageID = String(input.messageID ?? "");
   const pin = input.pin !== false;
-  if (!/^\\d{5,30}$/.test(threadID)) throw new TypeError("threadID must be a numeric Facebook ID");
+  if (!/^\d{5,30}$/.test(threadID)) throw new TypeError("threadID must be a numeric Facebook ID");
   if (!messageID || messageID.length > 256) throw new TypeError("messageID is invalid");
   const timestamp = input.timestamp ?? Date.now();
   if (!Number.isSafeInteger(timestamp) || timestamp < 1) throw new TypeError("timestamp is invalid");
   const taskId = input.taskId ?? randomInt(1, 65536);
   if (!Number.isInteger(taskId) || taskId < 1 || taskId > 65535) throw new TypeError("taskId is invalid");
   const epochId = input.epochId ?? offlineThreadingId(timestamp);
-  if (!/^\\d{10,24}$/.test(String(epochId))) throw new TypeError("epochId is invalid");
+  if (!/^\d{10,24}$/.test(String(epochId))) throw new TypeError("epochId is invalid");
   return Object.freeze({
     app_id: MESSENGER_MQTT_APP_ID,
     payload: JSON.stringify({
