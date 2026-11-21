@@ -506,9 +506,13 @@ export function createFcaClient(api: object): Readonly<{
   account: Readonly<Record<string, (...args: any[]) => any>>;
 }>;
 
+export interface MessengerBotClient {
+  login(credentials: { mode: "appstate"; appState: Cookie[] } | { mode: "session" }, options?: Record<string, unknown>): Promise<ClientApi>;
+  logout(): Promise<void>;
+}
 export interface MessengerBot {
   readonly api: ClientApi;
-  readonly client: Client;
+  readonly client: MessengerBotClient;
   readonly commandPrefix: string;
   command(names: string | string[], handler: (context: MessengerBotContext) => unknown | Promise<unknown>): this;
   hears(pattern: string | RegExp, handler: (context: MessengerBotContext) => unknown | Promise<unknown>): this;

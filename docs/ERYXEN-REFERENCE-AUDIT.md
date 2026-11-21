@@ -169,3 +169,12 @@ The current public API checklist includes:
 
 These additions are source-level implementations and deterministic tests; Facebook live acceptance remains a separate gate. Remaining methods in the checklist must be implemented or explicitly marked unsupported one at a time. Do not claim complete parity while any item remains missing, experimental, or live-unverified.
 
+
+
+### Higher-level API compatibility update
+
+- `createFcaClient(api)` is now implemented as a frozen, domain-grouped facade. It exposes only methods actually available on the supplied API object.
+- `createMessengerBot(credentials, options)` and the `MessengerBot` class are now implemented with command, hears, messageCreate event, launch and stop lifecycle support. This is a thin high-level wrapper over the first-party FCA client, not a separate Messenger transport.
+- `api.logout(callback?)` is exposed on the returned FCA API.
+- `api.createGroup(title, participantIDs, callback?)` adapts the documented EryXen argument order to the native `createNewGroup(participantIDs, title, callback?)`.
+- `api.e2ee` namespace now exposes only the implemented connect/disconnect/status/thread/message/media operations. It does not claim E2EE edit, reaction or unsend support unless those methods are separately added.

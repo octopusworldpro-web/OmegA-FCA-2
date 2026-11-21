@@ -174,3 +174,34 @@ The personal-session bootstrap follows up to five same-site HTTPS redirects on F
 The package includes an MIT-licensed, separate Messenger E2EE client for one-to-one encrypted text and media, with a Noise WebSocket transport, device/prekey management, per-device sessions, and encrypted media transfer. Connect with `api.connectE2EE()`, then use `api.sendE2EEMessage()` or `api.sendMessage(input, { e2ee: "required" })`. Persistent device keys are encrypted with AES-256-GCM; configure a 32-byte `e2eeStorageKey` (or reuse the configured SessionGuard key). See [docs/E2EE.md](docs/E2EE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Group Sender Keys/SKDM, encrypted history backup/restore, E2EE calls and key-transparency verification are not implemented. Private Meta endpoint and Noise-handshake live acceptance with an authorized AppState is still required; synthetic tests do not prove live Meta compatibility.
+
+
+## EryXen-compatible convenience APIs
+
+The native FCA facade also exposes media/location helpers and a namespaced client:
+
+```js
+const { createFcaClient, createMessengerBot } = require("@nirzon-islam/omega-fca");
+
+const client = createFcaClient(api);
+await client.messages.send("Hello!", threadID);
+await client.threads.getInfo(threadID);
+await client.users.getInfo(userID);
+await client.account.refreshDtsg();
+```
+
+A small command/keyword bot wrapper is available when you want a higher-level event-driven interface:
+
+```js
+const bot = await createMessengerBot(
+  { appState: require("./account.txt") },
+  { commandPrefix: "/" }
+);
+
+bot.command("ping", async ctx => ctx.replyAsync("pong"));
+bot.hears(/hello/i, async ctx => ctx.replyAsync("Hi!"));
+bot.on("messageCreate", event => console.log(event.body));
+bot.launch();
+```
+
+`createMessengerBot` uses the same owner-supplied AppState/session login and FCA transport. It does not bypass Facebook checkpoints or provide credential login.
