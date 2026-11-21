@@ -1862,8 +1862,7 @@ E2EEClient.prototype.miUploadMedia = function(media, uploadToken, serverMediaTyp
     toBase64Url(uploadToken) +
     "&" +
     this.buildMIAuthQuery();
-  return http
-    .request({
+  return self.httpRequest({
       method: "POST",
       url: url,
       jar: self.ctx.jar,
