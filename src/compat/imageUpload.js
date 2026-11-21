@@ -80,7 +80,8 @@ async function readImageInput(input, options = {}) {
   if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_IMAGE_UPLOAD_BYTES) throw new TypeError("maxBytes must be between 1 and 10 MiB");
   const buffer = await readBytes(input, maxBytes);
   const detected = detectImageMime(buffer);
-  const rawName = typeof input === "string" ? path.basename(input) : (typeof input?.path === "string" ? path.basename(input.path) : (typeof input?.name === "string" ? path.basename(input.name) : ""));
+  const sourceName = typeof input === "string" ? input : (typeof input?.path === "string" ? input.path : (typeof input?.name === "string" ? input.name : ""));
+  const rawName = sourceName ? path.basename(sourceName.replace(/\\/g, "/")) : "";
   const safeName = rawName && !/[\r\n\0]/.test(rawName) ? rawName : "";
   const extension = path.extname(safeName).toLowerCase();
   const fileName = safeName && extension === detected.extension ? safeName : "upload" + detected.extension;
@@ -145,7 +146,8 @@ function filenameFromDisposition(value) {
   if (typeof value !== "string") return null;
   const utf = /filename\*=UTF-8''([^;]+)/i.exec(value);
   const plain = /filename="?([^";]+)"?/i.exec(value);
-  const raw = utf ? decodeURIComponent(utf[1]) : plain?.[1];
+  let raw = plain?.[1] || null;
+  if (utf) { try { raw = decodeURIComponent(utf[1]); } catch {} }
   if (!raw) return null;
   const name = path.basename(raw.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180);
   return name || null;
