@@ -494,3 +494,11 @@ export interface FacebookThreadApi {
 }
 export const FACEBOOK_THREAD_DOC_IDS: Readonly<{ threadList: string; threadInfo: string; threadHistory: string; reaction: string }>;
 export function createFacebookThreadApi(options: { session: PersonalSession; webClient?: FacebookWebClient }): FacebookThreadApi;
+
+/** Creates a domain-grouped facade over the methods available on an FCA API object. */
+export function createFcaClient(api: object): Readonly<{
+  messages: Readonly<Record<string, (...args: any[]) => any>>;
+  threads: Readonly<Record<string, (...args: any[]) => any>>;
+  users: Readonly<Record<string, (...args: any[]) => any>>;
+  account: Readonly<Record<string, (...args: any[]) => any>>;
+}>;
