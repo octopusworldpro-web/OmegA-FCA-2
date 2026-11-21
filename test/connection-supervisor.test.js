@@ -180,9 +180,12 @@ test("stopping during listener recovery prevents the supervisor from restarting"
   supervisor.listen(() => {});
   listener(new Error("synthetic listener failure"));
   await disconnectSignal;
-  await supervisor.stop();
-  releaseDisconnect();
+  let stopSettled = false;
+  const stopping = supervisor.stop().finally(() => { stopSettled = true; });
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(stopSettled, false, "stop must wait for recovery to dispose the old driver");
+  releaseDisconnect();
+  await stopping;
 
   assert.equal(connectCount, 1);
   assert.equal(supervisor.snapshot().state, "stopped");
@@ -282,4 +285,44 @@ test("stop aborts a pending connect and disposes a driver that resolves late", a
     connected: false,
     generation: 2
   });
+});
+
+
+test("stop aborts a pending reconnect backoff immediately", async () => {
+  let attempts = 0;
+  let backoffSignal;
+  const supervisor = new ConnectionSupervisor({
+    connect: async () => {
+      attempts++;
+      throw Object.assign(new Error("temporary network failure"), { retryable: true });
+    },
+    options: { minDelayMs: 30000, maxDelayMs: 30000, jitter: 0, maxAttempts: 3 },
+    sleep: (ms, signal) => new Promise((resolve, reject) => {
+      backoffSignal = signal;
+      if (signal.aborted) reject(signal.reason);
+      else signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    })
+  });
+  const starting = supervisor.start();
+  for (let i = 0; i < 20 && !backoffSignal; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.ok(backoffSignal);
+  const stopping = supervisor.stop();
+  assert.equal(backoffSignal.aborted, true);
+  await stopping;
+  assert.equal(await starting, null);
+  assert.equal(attempts, 1);
+  assert.equal(supervisor.snapshot().state, "stopped");
+});
+
+test("rejects unsafe reconnect policy values", () => {
+  for (const options of [
+    { maxAttempts: 0 },
+    { minDelayMs: -1 },
+    { maxDelayMs: 1, minDelayMs: 2 },
+    { factor: 0.5 },
+    { jitter: 1.1 },
+    { maxAttempts: 101 }
+  ]) {
+    assert.throws(() => new ConnectionSupervisor({ connect: async () => ({}), options }), /Invalid connection retry options/);
+  }
 });
