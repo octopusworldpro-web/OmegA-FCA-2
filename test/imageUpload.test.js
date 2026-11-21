@@ -52,5 +52,5 @@ test("downloads only bounded HTTPS Facebook media URLs without credentials", asy
   assert.equal(result.mimeType, "image/jpeg");
   await assert.rejects(downloadAttachment("https://scontent.xx.fbcdn.net/file.jpg", {
     maxBytes: 2, fetchImpl: async () => new Response(bytes, { status: 200 })
-  }), /25 MiB/);
+  }), /configured byte limit/);
 });
