@@ -226,3 +226,46 @@ test("client does not expose arbitrary provider error codes or messages", async 
     }
   );
 });
+
+
+test("client facade forwards native httpGet Promise and callback signatures", async () => {
+  const calls = [];
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      httpGet(url, query, callback) {
+        if (typeof query === "function") {
+          callback = query;
+          query = undefined;
+        }
+        calls.push({ url, query });
+        if (typeof callback === "function") {
+          callback(null, "callback response");
+          return undefined;
+        }
+        return Promise.resolve("promise response");
+      },
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+
+  assert.equal(await api.httpGet("https://www.facebook.com/", { __a: 1 }), "promise response");
+  assert.deepEqual(calls[0], { url: "https://www.facebook.com/", query: { __a: 1 } });
+
+  const callbackResult = await new Promise((resolve, reject) => {
+    const returned = api.httpGet("https://www.facebook.com/", (error, value) => {
+      if (error) reject(error);
+      else resolve(value);
+    });
+    assert.equal(returned, undefined);
+  });
+  assert.equal(callbackResult, "callback response");
+  assert.deepEqual(calls[1], { url: "https://www.facebook.com/", query: undefined });
+  await client.logout();
+});
