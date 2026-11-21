@@ -381,3 +381,35 @@ test("legacy sendTypingIndicator returns an idempotent stop function", async () 
   const typingCalls = calls.filter(call => call.url === "https://www.facebook.com/ajax/messaging/typ.php");
   assert.deepEqual(typingCalls.map(call => call.body.typ), [1, 0]);
 });
+
+
+test("httpGet performs authenticated query requests and preserves response text", async () => {
+  let captured;
+  const raw = '{"payload":{"entries":[]}}';
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { get: async (url, options) => {
+      captured = { url, options };
+      return { raw, payload: {} };
+    } }
+  });
+  const result = await api.httpGet("https://www.facebook.com/ajax/typeahead/search.php", { value: "alice" });
+  assert.equal(result, raw);
+  assert.equal(captured.url, "https://www.facebook.com/ajax/typeahead/search.php");
+  assert.deepEqual(captured.options.query, { value: "alice" });
+});
+
+test("httpGet supports callbacks and rejects invalid query values", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { get: async () => ({ raw: "ok", payload: {} }) }
+  });
+  assert.throws(() => api.httpGet("https://www.facebook.com/", "not-an-object"), /query must be an object/);
+  let value;
+  api.httpGet("https://www.facebook.com/", (error, result) => {
+    assert.equal(error, null);
+    value = result;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(value, "ok");
+});
