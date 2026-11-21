@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const fs = require("node:fs/promises");
 
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_ATTACHMENT_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -33,7 +34,17 @@ function detectImageMime(buffer) {
 
 async function readBytes(input, maxBytes) {
   let buffer;
-  if (Buffer.isBuffer(input) || input instanceof Uint8Array) buffer = Buffer.from(input);
+  if (typeof input === "string" && input.trim()) {
+    const handle = await fs.open(input, "r");
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile()) throw new TypeError("Attachment path must point to a regular file");
+      if (stat.size > maxBytes) throw new RangeError("Attachment exceeds the 10 MiB upload safety limit");
+      buffer = await handle.readFile();
+    } finally {
+      await handle.close();
+    }
+  } else if (Buffer.isBuffer(input) || input instanceof Uint8Array) buffer = Buffer.from(input);
   else if (typeof Blob !== "undefined" && input instanceof Blob) {
     if (input.size > maxBytes) throw new RangeError("Attachment exceeds the 10 MiB upload safety limit");
     buffer = Buffer.from(await input.arrayBuffer());
@@ -57,8 +68,8 @@ async function readBytes(input, maxBytes) {
 }
 
 function safeFileName(input, extension) {
-  const raw = typeof input?.path === "string" ? path.basename(input.path) :
-    (typeof input?.name === "string" ? path.basename(input.name) : "");
+  const raw = typeof input === "string" ? path.basename(input) : (typeof input?.path === "string" ? path.basename(input.path) :
+    (typeof input?.name === "string" ? path.basename(input.name) : ""));
   const clean = raw && !/[\r\n\0]/.test(raw) ? raw : "";
   if (!clean) return "upload" + extension;
   return clean.slice(0, 180);
@@ -69,7 +80,7 @@ async function readImageInput(input, options = {}) {
   if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_IMAGE_UPLOAD_BYTES) throw new TypeError("maxBytes must be between 1 and 10 MiB");
   const buffer = await readBytes(input, maxBytes);
   const detected = detectImageMime(buffer);
-  const rawName = typeof input?.path === "string" ? path.basename(input.path) : (typeof input?.name === "string" ? path.basename(input.name) : "");
+  const rawName = typeof input === "string" ? path.basename(input) : (typeof input?.path === "string" ? path.basename(input.path) : (typeof input?.name === "string" ? path.basename(input.name) : ""));
   const safeName = rawName && !/[\r\n\0]/.test(rawName) ? rawName : "";
   const extension = path.extname(safeName).toLowerCase();
   const fileName = safeName && extension === detected.extension ? safeName : "upload" + detected.extension;
@@ -80,7 +91,7 @@ async function readAttachmentInput(input, options = {}) {
   const maxBytes = options.maxBytes ?? MAX_ATTACHMENT_UPLOAD_BYTES;
   if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_ATTACHMENT_UPLOAD_BYTES) throw new TypeError("maxBytes must be between 1 and 10 MiB");
   const buffer = await readBytes(input, maxBytes);
-  let extension = path.extname(typeof input?.path === "string" ? input.path : (typeof input?.name === "string" ? input.name : "")).toLowerCase();
+  let extension = path.extname(typeof input === "string" ? input : (typeof input?.path === "string" ? input.path : (typeof input?.name === "string" ? input.name : ""))).toLowerCase();
   let mimeType = MIME_BY_EXTENSION[extension] || "application/octet-stream";
   let kind = mimeType.startsWith("image/") ? "image" : mimeType.startsWith("video/") ? "video" : mimeType.startsWith("audio/") ? "audio" : "file";
   try {
