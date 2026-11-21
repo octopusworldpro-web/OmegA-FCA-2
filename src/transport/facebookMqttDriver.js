@@ -237,6 +237,13 @@ async function createFacebookMqttDriver({
       });
     }
     async function sendE2EEMessage(threadID, message, options = {}) {
+      const threadInfo = await threadApi.getThreadInfo(threadID);
+      if (!threadInfo || threadInfo.isGroup !== false) {
+        const error = new Error("This E2EE implementation currently supports verified one-to-one threads only; group Sender Keys are not implemented");
+        error.code = threadInfo?.isGroup === true ? "FCA_E2EE_GROUP_UNSUPPORTED" : "FCA_E2EE_THREAD_TYPE_UNKNOWN";
+        error.retryable = false;
+        throw error;
+      }
       const value = typeof message === "string" ? { body: message } : message;
       if (!value || typeof value !== "object" || Array.isArray(value)) {
         throw new TypeError("E2EE message must be a string or message object");
