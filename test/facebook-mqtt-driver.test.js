@@ -308,7 +308,12 @@ test("implements editMessage and shareContact with correlated MQTT requests", as
     const task = envelope.tasks[0];
     const taskPayload = JSON.parse(task.payload);
     let response;
-    if (task.queue_name === "edit_message") {
+    if (task.queue_name.startsWith("pin_msg_v2_") || task.queue_name.startsWith("unpin_msg_v2_")) {
+      assert.equal(taskPayload.thread_key, "222222222222222");
+      assert.equal(taskPayload.message_id, "mid-pin");
+      assert.ok(["430", "431"].includes(task.label));
+      response = { request_id: request.request_id, payload: { success: true } };
+    } else if (task.queue_name === "edit_message") {
       assert.ok(["mid-edit", "mid-old"].includes(taskPayload.message_id));
       assert.equal(taskPayload.text, "edited text");
       const candidate = [null, null, taskPayload.message_id, null,
@@ -338,6 +343,8 @@ test("implements editMessage and shareContact with correlated MQTT requests", as
       error.code === "FCA_MESSAGE_EDIT_REJECTED");
     const shared = await driver.shareContact("contact", "111111111111111", "222222222222222", "legacy-message-id");
     assert.equal(shared.success, true);
+    assert.equal((await driver.pinMessage("mid-pin", "222222222222222")).success, true);
+    assert.equal((await driver.unpinMessage("mid-pin", "222222222222222")).success, true);
   } finally {
     await driver.disconnect();
   }
