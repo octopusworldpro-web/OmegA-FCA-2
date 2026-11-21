@@ -661,7 +661,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
 
   function deleteMessage(messageID, callback) {
     const message = String(messageID ?? "").trim();
-    if (!message || message.length > 256 || /[\\u0000-\\u001f]/.test(message)) {
+    if (!message || message.length > 256 || /[\u0000-\u001f]/.test(message)) {
       throw new TypeError("messageID is invalid");
     }
     const operation = web.post(DELETE_MESSAGE_URL, { "message_ids[0]": message }).then(result => {
