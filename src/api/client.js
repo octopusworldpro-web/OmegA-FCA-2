@@ -7,9 +7,15 @@ const { validateTransportDriver } = require("../transport/contract");
 const { classifySessionState } = require("../security/sessionState");
 
 const METHOD_FEATURES = Object.freeze({
-  sendMessage: "messaging", editMessage: "messaging", shareContact: "messaging", sendRequest: "messaging", unsendMessage: "messaging", markAsRead: "messaging", sendTypingIndicator: "messaging",
-  getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads", getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads", getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads", createNewGroup: "groups",
-  addUserToGroup: "groups", removeUserFromGroup: "groups", createNewGroup: "groups", changeNickname: "groups",
+  sendRequest: "messaging", sendMessage: "messaging", editMessage: "messaging",
+  shareContact: "messaging", unsendMessage: "messaging", markAsRead: "messaging",
+  markAsDelivered: "messaging", sendTypingIndicator: "messaging",
+  getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads",
+  getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads",
+  getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads",
+  createNewGroup: "groups", addUserToGroup: "groups", removeUserFromGroup: "groups",
+  changeNickname: "groups", changeGroupImage: "groups", changeAvatar: "groups",
+  changeThreadColor: "groups", changeThreadEmoji: "groups", setTitle: "groups",
   setMessageReaction: "reactions"
 });
 
@@ -17,7 +23,7 @@ const DRIVER_METHODS = [
   "sendRequest", "sendMessage", "editMessage", "shareContact", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
   "markAsRead", "markAsDelivered", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
   "changeNickname", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
-  "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl", "createNewGroup"
+  "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
 ];
 
 function createClient({ authenticate, options = {}, reconnect = {}, license = {}, requireLicense = false, onLicenseError = () => {} } = {}) {
