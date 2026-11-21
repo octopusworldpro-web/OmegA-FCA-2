@@ -23,10 +23,10 @@ Status labels:
 | GoatBot session compatibility | getCookies | Sensitive cookie-header accessor required by the current `suspend` command; implemented natively and must remain owner-only in command exposure. |
 | Session recovery | sessionGuard, saveSession, restoreSessionBackup, stopSessionGuard | Encrypted AES-256-GCM sidecar, verified backup recovery, periodic/final save and account-bound restore are implemented and synthetic-tested; legacy account.txt is never overwritten |
 | Realtime | MQTT connect, listenMqtt, ready, error, auto-reconnect, event subscriptions | Native WebSocket/MQTT driver, supervisor and callback facade are implemented; live broker and event parity remain unverified |
-| Messages | sendMessage, editMessage, unsendMessage, deleteMessage, getMessage, broadcast | sendMessage is experimental; unsendMessage is implemented with synthetic web-action tests; delete/broadcast are missing or not verified; `editMessage` and `shareContact` now have native MQTT request builders with synthetic response tests; `getMessage` is implemented as a lookup in the latest 100 normalized thread-history messages |
+| Messages | sendMessage, editMessage, unsendMessage, deleteMessage, getMessage, broadcast | sendMessage is experimental; unsendMessage is implemented with synthetic web-action tests; `deleteMessage` (delete-for-me) is implemented with a separate authenticated endpoint; `deleteThread` supports one or multiple IDs; `editMessage` and `shareContact` have native MQTT request builders with synthetic response tests; `getMessage` is implemented as a lookup in the latest 100 normalized thread-history messages; `sendBroadcast` remains a higher-level helper not yet implemented |
 | Attachments and media | uploadAttachment, forwardAttachment, sendImage, sendVideo, sendAudio, sendFile, sendGif, sendLocation, shareLink, shareContact | `changeGroupImage` and `changeAvatar` perform bounded JPEG/PNG/GIF/WebP multipart uploads with MIME sniffing and response validation; generic message attachments, downloads, forwarding and attachment event parity remain missing; do not return dummy success |
-| Reactions and receipts | setMessageReaction, markAsRead, markAsReadAll, markAsDelivered, markAsSeen, typing | setMessageReaction, markAsRead, markAsDelivered and sendTypingIndicator have first-party synthetic-tested paths; markAsReadAll/markAsSeen need audit |
-| Threads | getThreadList, getThreadInfo, getThreadHistory, getMessage, createGroup, deleteThread, muteThread, archive, request handling, search | list/info/history, latest-100 `getMessage`, typeahead `getUserID`, `getFriendsList`, `getUID`, `resolvePhotoUrl`, `createNewGroup`, and selected group operations now have synthetic-tested adapters; delete/mute/archive/request/search operations still need audit |
+| Reactions and receipts | setMessageReaction, markAsRead, markAsReadAll, markAsDelivered, markAsSeen, typing | setMessageReaction, markAsRead, markAsDelivered and sendTypingIndicator have first-party synthetic-tested paths; markAsReadAll and markAsSeen now have authenticated web-action implementations with callback/Promise support and synthetic tests |
+| Threads | getThreadList, getThreadInfo, getThreadHistory, getMessage, createGroup, deleteThread, muteThread, archive, request handling, search | list/info/history, latest-100 `getMessage`, typeahead `getUserID`, `getFriendsList`, `getUID`, `resolvePhotoUrl`, `createNewGroup`, and selected group operations now have synthetic-tested adapters; deleteThread, muteThread and changeArchivedStatus now have authenticated web-action implementations with synthetic tests; handleMessageRequest and searchForThread still need protocol evidence |
 | Thread customization | setTitle, changeThreadColor, changeThreadEmoji, changeNickname, changeGroupImage, changeAdminStatus, polls, pin/unpin | title/color/emoji/nickname and add/remove member paths have synthetic-tested adapters; group-image upload plus MQTT change action is implemented with synthetic tests; admin/poll/pin operations remain missing or unverified |
 | Users and social | getUserInfo, getUID, getFriendsList, avatar/profile/public data, friend/block/follow actions, post/comment/share/reactions | getUserInfo is implemented with synthetic tests; other methods are missing or require an evidence-backed contract |
 | HTTP helpers | httpGet, httpPost, multipart form data | bounded authenticated Facebook/Messenger HTTPS web client exposes Promise/callback `httpGet` and `httpPost`; multipart upload is used by profile/group image changes. Generic multipart/attachment compatibility remains incomplete |
@@ -104,3 +104,21 @@ The public checklist is a comparison target, not proof that every method is safe
 - `getFriendsList()` normalizes the authenticated `/chat/user_info_all` response.
 - `createNewGroup(participantIDs, title?)` uses the observed Messenger GraphQL mutation, validates participant IDs, and returns the created thread ID.
 - These private Facebook endpoints are unofficial and still need authorized live-account acceptance; synthetic tests verify request construction and response normalization.
+
+
+## Remaining FCA API implementation update (2026-11-21)
+
+The following previously missing flat FCA methods have now been implemented in the first-party facebookThreadApi and exposed through the authenticated client facade. They support Promise use and the legacy error-first callback form:
+
+| Method | Request contract | Semantics |
+|---|---|---|
+| `markAsReadAll(callback?)` | `POST /ajax/mercury/mark_folder_as_read.php`, `folder=inbox` | Marks the inbox folder read |
+| `markAsSeen(timestamp?, callback?)` | `POST /ajax/mercury/mark_seen.php`, `seen_timestamp` | Updates the account's seen watermark |
+| `deleteMessage(messageID, callback?)` | `POST /ajax/mercury/delete_messages.php`, `message_ids[0]` | Deletes the message from this account's view; distinct from unsend |
+| `deleteThread(threadIDs, callback?)` | `POST /ajax/mercury/delete_thread.php`, `client=mercury`, indexed `ids[n]` | Removes one or more threads from the inbox |
+| `muteThread(threadID, seconds, callback?)` | `POST /ajax/mercury/change_mute_thread.php`, `thread_fbid`, `mute_settings` | -1 permanent, 0 unmute, positive duration in seconds |
+| `changeArchivedStatus(threadIDs, archive, callback?)` | `POST /ajax/mercury/change_archived_status.php`, `ids[threadID]` | Archives or unarchives one or more threads |
+
+Each action validates IDs and input bounds and rejects Facebook-declared errors rather than returning a synthetic success. Regression tests cover the endpoint, payload, callback form, validation and rejection paths.
+
+Still not claimed as complete: deleteMessage/thread mutation endpoints need authorized live-account acceptance; changeAdminStatus, createPoll, searchForThread, getThreadPictures, handleMessageRequest, broadcast, namespaced client, MessengerBot and E2EE remain separate implementation gaps. No EryXen runtime code or dependencies were copied into FCA-2.
