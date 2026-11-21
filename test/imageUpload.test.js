@@ -74,3 +74,20 @@ test("reads local attachment paths with file-size and filename bounds", async ()
   }
 });
 
+
+
+test("normalizes Windows-style attachment paths without leaking directory segments", async () => {
+  const input = Object.assign(Buffer.from("%PDF-1.7 test"), { name: "C:\\private\\folder\\report.pdf" });
+  const result = await readAttachmentInput(input);
+  assert.equal(result.fileName, "report.pdf");
+  assert.equal(result.mimeType, "application/pdf");
+});
+
+test("maps any aborted media request to the stable download-timeout error", async () => {
+  await assert.rejects(downloadAttachment("https://scontent.xx.fbcdn.net/file.bin", {
+    timeoutMs: 1000,
+    fetchImpl: (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(new Error("request aborted")), { once: true });
+    })
+  }), error => error.code === "FCA_ATTACHMENT_DOWNLOAD_TIMEOUT");
+});
