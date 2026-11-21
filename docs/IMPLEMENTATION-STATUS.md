@@ -4,7 +4,7 @@
 
 - Node.js 20+ CommonJS package, root exports and TypeScript declarations.
 - Cookie/AppState parsing and validation, encrypted session helpers, restrictive file permissions and secret redaction.
-- **New encrypted SessionGuard integration:** explicit-key AES-256-GCM snapshots, verified backup recovery, periodic saves, final save on shutdown, account-ID verification on restore, and GoatBot's legacy `sessionGuard(account.txt, options)` call supported as a non-destructive alias for a separately configured encrypted file. `FCA_SESSION_FILE`, `FCA_SESSION_KEY`, and `FCA_SESSION_INTERVAL_MS` are optional deployment variables; the encrypted file and backup are rejected if they resolve to the Bot's root `account.txt`.
+- **New encrypted SessionGuard integration:** explicit-key AES-256-GCM snapshots, verified backup recovery, periodic saves, final save on shutdown, account-ID verification on restore, and GoatBot's legacy `sessionGuard(account.txt, options)` call supported as a non-destructive alias for a separately configured encrypted file. `FCA_SESSION_FILE`, `FCA_SESSION_KEY`, and `FCA_SESSION_INTERVAL_MS` are optional deployment variables; the encrypted file and backup are rejected if they resolve to the Bot's root `account.txt`, `appstate.json`, or `config.json`.
 - **Updated:** account configuration is AppState-only for this phase. `account.txt` accepts cookie/AppState data only and rejects credential-like key/value text. The loader does not read email, username, password, 2FA, or `FB_*` environment credentials; credential login is deferred.
 - **New AppState test entry point:** `npm run test:appstate` validates an owner-supplied AppState from `account.txt` (or the documented `appstate.json` fallback), reports only non-secret session metadata, and is deliberately excluded from CI because it requires a real authorized session and network access.
 - **New owner-operated MQTT acceptance command:** `npm run test:messenger-mqtt` loads the local AppState, attempts native MQTT readiness, and logs only event types. Sending is opt-in and requires `--send` plus explicit `FCA_TEST_THREAD_ID` and `FCA_TEST_MESSAGE` values. This live check is excluded from CI; client publish acceptance is not proof of recipient delivery.
@@ -125,3 +125,14 @@ Never commit live cookies, AppState, passwords, 2FA material, Page tokens, or en
 - A method-by-method source audit is recorded in [ERYXEN-API-PARITY-MATRIX.md](ERYXEN-API-PARITY-MATRIX.md). It distinguishes implemented source paths, adapters, partial semantics, missing methods and live-unverified behavior.
 - Definite public API gaps recorded for later implementation: `pinMessage`, `unpinMessage`, `sendFriendRequest`, `followUser`, `unfollowUser`, `postComment`, `sharePost`, `uploadImageToImgbb`, and a distinct `listenE2EE` API. E2EE reaction/typing/unsend/edit/mark-read parity is also incomplete.
 - Step 2 is an audit/documentation gate only. It does not claim those missing methods are implemented or that Facebook live-account acceptance has passed.
+
+
+## Serial workflow checkpoint — Step 4 complete (2026-11-21)
+
+- Hardened `ConnectionSupervisor` retry policy validation: bounded attempts, delays, exponential factor and jitter are validated before connecting.
+- Reconnect backoff now accepts cancellation; `stop()` aborts a pending delay immediately instead of waiting for the full retry timer.
+- `stop()` now waits for an in-flight listener-recovery cleanup before reporting the supervisor as stopped, preventing shutdown from racing an old driver's disposal.
+- MQTT keepalive is validated as an integer from 0 to 65,535 seconds. PINGREQ is sent at half the negotiated interval; a matching PINGRESP clears the outstanding heartbeat, and a missing response closes the stale socket so the supervisor can reconnect. A keepalive value of zero disables heartbeat traffic.
+- Added regression tests for aborting reconnect backoff, waiting for recovery disposal, invalid retry policies, PINGRESP handling, missing-response socket closure, and keepalive bounds.
+- GitHub Actions run #306 (`44877756730`) passed on Node.js 20 and 22: 376 tests passed, 0 failed on each runtime; syntax checks, package root export smoke test, and publishable package verification also passed.
+- This is synthetic transport/CI verification. No authorized live Facebook account or production broker acceptance test has been run; live reconnect and event delivery remain an owner-operated acceptance gate.
