@@ -294,3 +294,29 @@ test("legacy sendMessage accepts a reply ID in the third argument when callback 
   await client.logout();
 });
 
+test("client exposes legacy media, link and location send helpers", async () => {
+  const sent = [];
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      sendMessage: async input => { sent.push(input); return { messageID: "m" + sent.length }; },
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  await api.sendLocation(23.8, 90.4, "987654321");
+  await api.sendImage(Buffer.from("image"), "987654321", "caption");
+  await api.sendGif("https://media.example.test/clip.gif", "987654321", "gif caption");
+  await api.shareLink("https://example.test/page", "987654321", "link caption");
+  assert.deepEqual(sent[0].message, { location: { latitude: 23.8, longitude: 90.4 } });
+  assert.deepEqual(sent[1].message, { body: "caption", attachment: Buffer.from("image") });
+  assert.deepEqual(sent[2].message, { body: "gif caption", url: "https://media.example.test/clip.gif" });
+  assert.deepEqual(sent[3].message, { body: "link caption", url: "https://example.test/page" });
+  await client.logout();
+});
+
