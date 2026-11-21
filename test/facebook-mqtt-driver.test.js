@@ -199,7 +199,7 @@ test("SessionGuard refuses to use the GoatBot account.txt path for encrypted out
     appState,
     socketFactory: () => new FakeWebSocket(),
     sessionGuard: { filePath: path.resolve(process.cwd(), "account.txt"), key: "e".repeat(64) }
-  }), /separate from GoatBot account.txt/);
+  }), /separate from account\\.txt, appstate\\.json, and config\\.json/);
 });
 
 test("SessionGuard protects account, AppState, and config files as both primary and backup paths", async () => {
