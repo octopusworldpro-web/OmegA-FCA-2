@@ -16,7 +16,7 @@ const METHOD_FEATURES = Object.freeze({
   createNewGroup: "groups", addUserToGroup: "groups", removeUserFromGroup: "groups",
   changeNickname: "groups", changeAdminStatus: "groups", createPoll: "groups", changeGroupImage: "groups", changeAvatar: "groups", changeBlockedStatus: "users", changeBio: "users", unfriend: "users",
   changeThreadColor: "groups", changeThreadEmoji: "groups", setTitle: "groups",
-  setMessageReaction: "reactions"
+  setMessageReaction: "reactions", setPostReaction: "reactions", reactToPost: "reactions", reactToComment: "reactions", handleFriendRequest: "users"
 });
 
 const DRIVER_METHODS = [

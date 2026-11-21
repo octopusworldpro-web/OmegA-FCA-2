@@ -522,7 +522,7 @@ test("post/comment reactions and friend-request decisions use validated FCA requ
   assert.equal(JSON.parse(calls[2].body.variables).input.feedback_reaction, 4);
   assert.equal(calls[3].url, "https://www.facebook.com/requests/friends/ajax/");
   assert.equal(calls[3].body.action, "confirm");
-  await assert.rejects(api.setPostReaction("987654321", "unknown"), /invalid reaction type/);
+  assert.throws(() => api.setPostReaction("987654321", "unknown"), /invalid reaction type/);
   assert.throws(() => api.handleFriendRequest("987654321", "yes"), /accept must be a boolean/);
 });
 
