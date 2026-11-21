@@ -83,3 +83,301 @@ test("Thread API validates identifiers and supports error-first callbacks", asyn
   await new Promise(resolve => setImmediate(resolve));
   assert.ok(callbackError instanceof Error);
 });
+
+test("httpPost preserves authenticated Facebook response text for GoatBot legacy commands", async () => {
+  let captured;
+  const raw = '{"data":{"viewer":{"friending_possibilities":{"edges":[]}}}}';
+  const api = createFacebookThreadApi({
+    session,
+    webClient: {
+      post: async (url, form) => {
+        captured = { url, form };
+        return { raw, payload: JSON.parse(raw) };
+      }
+    }
+  });
+  const response = await api.httpPost("https://www.facebook.com/api/graphql/", { doc_id: "123", variables: "{}" });
+  assert.equal(response, raw);
+  assert.equal(captured.url, "https://www.facebook.com/api/graphql/");
+  assert.equal(captured.form.doc_id, "123");
+});
+
+test("httpPost supports error-first callbacks and rejects non-object forms", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ raw: "ok" }) }
+  });
+  assert.throws(() => api.httpPost("https://www.facebook.com/api/graphql/", "not-an-object"), /form must be an object/);
+  let result;
+  api.httpPost("https://www.facebook.com/api/graphql/", {}, (error, value) => {
+    assert.equal(error, null);
+    result = value;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(result, "ok");
+});
+
+test("unsendMessage uses the authenticated Facebook unsend endpoint", async () => {
+  let captured;
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      captured = { url, body };
+      return { payload: { success: true } };
+    } }
+  });
+  const result = await api.unsendMessage("mid.123");
+  assert.equal(captured.url, "https://www.facebook.com/messaging/unsend_message/");
+  assert.deepEqual(captured.body, { message_id: "mid.123" });
+  assert.deepEqual(result, { success: true });
+});
+
+test("unsendMessage rejects invalid IDs and reports Facebook action errors", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ payload: { error: "rejected" } }) }
+  });
+  assert.throws(() => api.unsendMessage(""), /messageID is invalid/);
+  await assert.rejects(api.unsendMessage("mid.123"), error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED");
+});
+
+test("thread title, color and emoji actions use the authenticated customization endpoints", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      calls.push({ url, body });
+      return { payload: { success: true } };
+    } }
+  });
+  await api.setTitle("Test Group", "123456789012345");
+  await api.changeThreadColor("196241301102133", "123456789012345");
+  await api.changeThreadEmoji("🎉", "123456789012345");
+  assert.equal(calls[0].url, "https://www.facebook.com/messaging/set_thread_name/");
+  assert.equal(calls[0].body.thread_name, "Test Group");
+  assert.equal(calls[0].body.thread_fbid, "123456789012345");
+  assert.match(calls[0].body.offline_threading_id, /^[0-9]{10,24}$/);
+  assert.match(calls[0].body.threading_id, /^<[0-9]+:[0-9]+-omega-fca@mail[.]projektitan[.]com>$/);
+  assert.equal(calls[1].url, "https://www.facebook.com/messaging/save_thread_color/?source=thread_settings&dpr=1");
+  assert.equal(calls[1].body.color_choice, "");
+  assert.equal(calls[2].url, "https://www.facebook.com/messaging/save_thread_emoji/?source=thread_settings&dpr=1");
+  assert.equal(calls[2].body.emoji_choice, "🎉");
+});
+
+test("thread customization methods validate input and normalize Facebook errors", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ payload: { error: 1545012 } }) }
+  });
+  assert.throws(() => api.setTitle("x", "bad"), /numeric Facebook ID/);
+  assert.throws(() => api.changeThreadColor("x".repeat(65), "123456789012345"), /theme ID/);
+  assert.throws(() => api.changeThreadEmoji("x".repeat(17), "123456789012345"), /up to 16/);
+  await assert.rejects(api.setTitle("Test", "123456789012345"), error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED");
+  await assert.rejects(api.changeThreadColor("#ff0000", "123456789012345"), error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED");
+  await assert.rejects(api.changeThreadEmoji("🎉", "123456789012345"), error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED");
+});
+
+test("sendTypingIndicator sends start and stop requests to the Messenger typing endpoint", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      calls.push({ url, body });
+      if (url === "https://www.facebook.com/chat/user_info/") {
+        return { payload: { payload: { profiles: { "123456789012345": { name: "Test" } } } } };
+      }
+      return { payload: { success: true } };
+    } }
+  });
+  await api.sendTypingIndicator("123456789012345", true);
+  await api.sendTypingIndicator("123456789012345", false);
+  await api.sendTypingIndicator(1, "123456789012345", undefined, false);
+  const typingCalls = calls.filter(call => call.url === "https://www.facebook.com/ajax/messaging/typ.php");
+  assert.equal(typingCalls.length, 3);
+  assert.equal(typingCalls[0].body.typ, 1);
+  assert.equal(typingCalls[0].body.thread, "123456789012345");
+  assert.equal(typingCalls[0].body.to, "123456789012345");
+  assert.equal(typingCalls[1].body.typ, 0);
+  assert.equal(typingCalls[2].body.typ, 1);
+  assert.equal(typingCalls[2].body.to, "123456789012345");
+});
+
+test("sendTypingIndicator validates thread and state", async () => {
+  const api = createFacebookThreadApi({ session, webClient: { post: async () => ({ payload: {} }) } });
+  assert.throws(() => api.sendTypingIndicator("", true), /numeric Facebook ID/);
+  assert.throws(() => api.sendTypingIndicator("123456789012345", "yes"), /typing must be a boolean/);
+});
+
+test("sendTypingIndicator accepts callback as the second argument", async () => {
+  let completed = false;
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async url => url === "https://www.facebook.com/chat/user_info/" ? ({ payload: { payload: { profiles: { "123456789012345": { name: "Test" } } } } }) : ({ payload: { success: true } }) }
+  });
+  api.sendTypingIndicator("123456789012345", error => {
+    assert.equal(error, null);
+    completed = true;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(completed, true);
+});
+
+test("markAsDelivered sends the message and thread receipt fields", async () => {
+  let captured;
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      captured = { url, body };
+      return { payload: { success: true } };
+    } }
+  });
+  await api.markAsDelivered("123456789012345", "mid.123");
+  assert.equal(captured.url, "https://www.facebook.com/ajax/mercury/delivery_receipts.php");
+  assert.equal(captured.body["message_ids[0]"], "mid.123");
+  assert.equal(captured.body["thread_ids[123456789012345][0]"], "mid.123");
+});
+
+test("markAsDelivered validates IDs and normalizes rejected receipts", async () => {
+  const api = createFacebookThreadApi({ session, webClient: { post: async () => ({ payload: { error: 1 } }) } });
+  assert.throws(() => api.markAsDelivered("", "mid.123"), /numeric Facebook ID/);
+  await assert.rejects(api.markAsDelivered("123456789012345", "mid.123"), error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED");
+});
+
+
+test("getMessage resolves a message from normalized thread history and supports not-found", async () => {
+  let calls = 0;
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      calls++;
+      const query = JSON.parse(body.queries).o0;
+      assert.equal(query.query_params.id, "987654321");
+      return { payload: batch({ message_thread: {
+        thread_type: "ONE_TO_ONE",
+        messages: { nodes: [{
+          __typename: "UserMessage", message_id: "mid.target",
+          message_sender: { id: "987654321" },
+          timestamp_precise: "1700000000001",
+          message: { text: "target message", ranges: [] }, blob_attachments: []
+        }] }
+      } }) };
+    } }
+  });
+  const found = await api.getMessage("987654321", "mid.target");
+  assert.equal(found.messageID, "mid.target");
+  assert.equal(found.body, "target message");
+  const missing = await api.getMessage("987654321", "mid.missing");
+  assert.equal(missing, null);
+  assert.equal(calls, 2);
+  assert.throws(() => api.getMessage("bad", "mid.target"), /numeric Facebook ID/);
+  assert.throws(() => api.getMessage("987654321", ""), /messageID is invalid/);
+});
+
+
+test("getUserID and getUID resolve Facebook profile names and URLs", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { get: async (url, options) => {
+      calls.push({ url, options });
+      return { payload: { payload: { entries: [{
+        uid: "111111111111111",
+        photo: "https://scontent.xx.fbcdn.net/photo.jpg",
+        index_rank: 1, text: "Alice Example", is_verified: false,
+        path: "/alice.example", category: "user", score: 100, type: "user"
+      }] } } };
+    } }
+  });
+  const entries = await api.getUserID("Alice Example");
+  assert.equal(entries[0].userID, "111111111111111");
+  assert.equal(entries[0].name, "Alice Example");
+  const resolved = await api.getUID("https://www.facebook.com/alice.example");
+  assert.equal(resolved, "111111111111111");
+  assert.equal(await api.getUID("https://www.facebook.com/profile.php?id=222222222222222"), "222222222222222");
+  assert.equal(await api.getUID("333333333333333"), "333333333333333");
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "https://www.facebook.com/ajax/typeahead/search.php");
+  assert.equal(calls[0].options.query.viewer, session.userId);
+  assert.equal(calls[0].options.query.value, "alice example");
+  assert.throws(() => api.getUID("https://evil.example/alice"), /facebook.com/);
+});
+
+test("resolvePhotoUrl extracts only HTTPS Facebook CDN photo URLs", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { get: async (url, options) => {
+      assert.equal(url, "https://www.facebook.com/mercury/attachments/photo");
+      assert.equal(options.query.photo_id, "123456789012345");
+      return { payload: { jsmods: { require: [[null, null, null, ["https://scontent.xx.fbcdn.net/photo.jpg"]]] } } };
+    } }
+  });
+  assert.equal(await api.resolvePhotoUrl("123456789012345"), "https://scontent.xx.fbcdn.net/photo.jpg");
+  const bad = createFacebookThreadApi({
+    session,
+    webClient: { get: async () => ({ payload: { jsmods: { require: [[null, null, null, ["https://evil.example/photo.jpg"]]] } } }) }
+  });
+  await assert.rejects(bad.resolvePhotoUrl("123456789012345"), /approved CDN hosts/);
+});
+
+test("getFriendsList normalizes friend metadata", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body, options) => {
+      assert.equal(url, "https://www.facebook.com/chat/user_info_all");
+      assert.equal(options.query.viewer, session.userId);
+      return { payload: { payload: {
+        a: { id: "111111111111111", name: "Alice", firstName: "Alice", gender: 2, is_friend: true, thumbSrc: "https://scontent.xx.fbcdn.net/a.jpg" },
+        b: { id: "222222222222222", name: "Bob", gender: 1, is_friend: true }
+      } } };
+    } }
+  });
+  const friends = await api.getFriendsList();
+  assert.equal(friends.length, 2);
+  assert.equal(friends[0].userID, "111111111111111");
+  assert.equal(friends[0].gender, "male_singular");
+  assert.equal(friends[1].gender, "female_singular");
+});
+
+test("createNewGroup sends the observed GraphQL mutation and returns its thread ID", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, form) => {
+      assert.equal(url, "https://www.facebook.com/api/graphql/");
+      assert.equal(form.fb_api_req_friendly_name, "MessengerGroupCreateMutation");
+      const variables = JSON.parse(form.variables);
+      assert.equal(variables.input.actor_id, session.userId);
+      assert.equal(variables.input.entry_point, "jewel_new_group");
+      assert.equal(variables.input.thread_settings.name, "OmegA Group");
+      assert.deepEqual(variables.input.participants, [
+        { fbid: "111111111111111" }, { fbid: "222222222222222" }, { fbid: session.userId }
+      ]);
+      return { payload: { data: { messenger_group_thread_create: {
+        thread: { thread_key: { thread_fbid: "333333333333333" } }
+      } } } };
+    } }
+  });
+  assert.equal(await api.createNewGroup(["111111111111111", "222222222222222"], "OmegA Group"), "333333333333333");
+});
+
+
+test("legacy sendTypingIndicator returns an idempotent stop function", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      calls.push({ url, body: { ...body } });
+      if (url === "https://www.facebook.com/chat/user_info/") {
+        return { payload: { payload: { profiles: {
+          "987654321": { name: "Test User" }
+        } } } };
+      }
+      return { payload: { success: true } };
+    } }
+  });
+  const stopTyping = await api.sendTypingIndicator("987654321");
+  assert.equal(typeof stopTyping, "function");
+  await stopTyping();
+  await stopTyping();
+  const typingCalls = calls.filter(call => call.url === "https://www.facebook.com/ajax/messaging/typ.php");
+  assert.deepEqual(typingCalls.map(call => call.body.typ), [1, 0]);
+});

@@ -91,3 +91,41 @@ test("rejects oversized outbound action bodies before making a request", async (
     error => error.code === "FCA_REQUEST_TOO_LARGE");
   assert.equal(calls, 0);
 });
+
+
+test("posts bounded multipart forms with session tokens without overriding the boundary header", async () => {
+  let request;
+  const session = {
+    userId: "123456789",
+    getTokens: () => ({ fbDtsg: "dtsg", lsd: "lsd", jazoest: "22000" }),
+    getCookieHeader: () => "c_user=123456789",
+    request: async (url, options) => { request = { url, options }; return fakeResponse(); }
+  };
+  const client = createFacebookWebClient({ session });
+  const form = new FormData();
+  form.append("images_only", "true");
+  form.append("attachment[]", new Blob([Buffer.from([1, 2, 3])], { type: "image/png" }), "image.png");
+  const result = await client.postMultipart("https://www.facebook.com/ajax/mercury/upload.php", form);
+  assert.equal(result.payload.ok, true);
+  assert.equal(request.options.method, "POST");
+  assert.equal(request.options.body, form);
+  assert.equal(request.options.headers.has("content-type"), false);
+  assert.equal(form.get("av"), "123456789");
+  assert.equal(form.get("fb_dtsg"), "dtsg");
+  assert.equal(form.get("lsd"), "lsd");
+  assert.equal(form.get("jazoest"), "22000");
+  assert.equal(form.get("attachment[]").name, "image.png");
+});
+
+test("rejects oversized multipart bodies before making a request", async () => {
+  let calls = 0;
+  const client = createFacebookWebClient({
+    session: { userId: "1", getTokens: () => ({}), getCookieHeader: () => "",
+      request: async () => { calls++; return fakeResponse(); } }
+  });
+  const form = new FormData();
+  form.append("file", new Blob([Buffer.alloc(12 * 1024 * 1024 + 1)], { type: "image/png" }), "large.png");
+  await assert.rejects(client.postMultipart("https://www.facebook.com/upload/", form),
+    error => error.code === "FCA_REQUEST_TOO_LARGE");
+  assert.equal(calls, 0);
+});

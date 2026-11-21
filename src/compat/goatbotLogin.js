@@ -27,7 +27,9 @@ function createGoatBotLogin(client, accountConfigOptions = {}) {
     if (typeof callback !== "function") throw new TypeError("GoatBot login callback is required");
     const input = credentials && typeof credentials === "object" ? credentials : {};
     let loginInput;
-    if (Array.isArray(input.appState)) {
+    if (input.mode === "session") {
+      loginInput = { mode: "session" };
+    } else if (Array.isArray(input.appState)) {
       loginInput = { mode: "appstate", appState: input.appState };
     } else if ((typeof input.username === "string" || typeof input.email === "string") &&
         typeof (input.password || input.pass) === "string") {

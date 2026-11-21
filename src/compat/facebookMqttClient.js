@@ -31,11 +31,29 @@ function createFacebookMqttClient(options = {}) {
     maxPendingRequests,
     mqtt,
     onDiagnostic,
+    sessionGuard,
     reconnect,
     license,
     requireLicense,
     onLicenseError
   } = options;
+
+  // Optional deployment-only encrypted persistence. This keeps GoatBot's
+  // existing account.txt call site intact while storing encrypted snapshots
+  // separately. Never derive the key from Bot config.
+  const envSessionFile = process.env.FCA_SESSION_FILE;
+  const envSessionKey = process.env.FCA_SESSION_KEY;
+  const envInterval = Number(process.env.FCA_SESSION_INTERVAL_MS);
+  const configuredSessionGuard = sessionGuard || (
+    typeof envSessionFile === "string" && envSessionFile.trim() &&
+    typeof envSessionKey === "string" && envSessionKey.trim()
+      ? {
+          filePath: envSessionFile,
+          key: envSessionKey,
+          ...(Number.isInteger(envInterval) && envInterval >= 1000 ? { intervalMs: envInterval } : {})
+        }
+      : undefined
+  );
 
   if (typeof socketFactory !== "function") {
     throw new TypeError("socketFactory must be a function");
@@ -46,15 +64,16 @@ function createFacebookMqttClient(options = {}) {
     license,
     requireLicense,
     onLicenseError,
-    authenticate: ({ mode, credentials }) => {
-      if (mode !== "appstate") {
-        throw new TypeError("Native Messenger client currently supports AppState login only");
+    authenticate: ({ mode, credentials, options: loginOptions }) => {
+      if (mode !== "appstate" && mode !== "session") {
+        throw new TypeError("Native Messenger client supports AppState or encrypted SessionGuard login");
       }
       return createFacebookMqttDriver({
-        appState: credentials,
+        appState: mode === "appstate" ? credentials : undefined,
+        options: loginOptions || {},
         socketFactory,
         fetchImpl,
-        userAgent,
+        userAgent: loginOptions?.userAgent || userAgent,
         timeoutMs,
         connectTimeoutMs,
         closeTimeoutMs,
@@ -65,7 +84,8 @@ function createFacebookMqttClient(options = {}) {
         requestTimeoutMs,
         maxPendingRequests,
         mqtt,
-        onDiagnostic
+        onDiagnostic,
+        sessionGuard: configuredSessionGuard
       });
     }
   });

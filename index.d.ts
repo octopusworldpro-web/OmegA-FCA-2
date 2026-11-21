@@ -1,4 +1,4 @@
-export type LoginMode = "appstate" | "cookie";
+export type LoginMode = "appstate" | "cookie" | "session";
 export type AuthenticationAttemptState = "idle" | "authenticating" | "challenge_required" | "verifying_challenge" | "authenticated" | "failed" | "closed";
 export interface AuthenticationChallenge { readonly type: string; readonly message: string | null; readonly methods: readonly string[]; }
 export interface AuthenticationAttemptSnapshot { readonly state: AuthenticationAttemptState; readonly challenge: AuthenticationChallenge | null; readonly challengeRounds: number; readonly authenticated: boolean; readonly error: Readonly<{ name: string; code: string | null; message: string }> | null; }
@@ -25,6 +25,7 @@ export interface PersonalSession {
   readonly state: "active";
   readonly validatedAt: number;
   getTokens(): FacebookRequestTokens;
+  refreshTokens(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>;
   getCookieHeader(url?: string | URL): string;
   request(input: string | URL, options?: RequestInit): Promise<Response>;
   getAppState(): Cookie[];
@@ -72,15 +73,17 @@ export function createFacebookError(message: string, options?: {
 export interface ConnectionContext { attempt: number; generation: number; signal: AbortSignal; }
 export interface TransportDriver {
   listen(callback: (error: Error | null, event?: unknown) => void): (() => void) | void;
-  disconnect?(): void | Promise<void>; getCurrentUserID?(): string | number | null | Promise<string | number | null>;
-  sendMessage?(...args: unknown[]): unknown; getUserInfo?(...args: unknown[]): unknown;
+  disconnect?(): void | Promise<void>; getCurrentUserID?(): string | number | null | Promise<string | number | null>; getAppState?(): Cookie[] | Promise<Cookie[]>; getCookies?(): string | Promise<string>; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; refreshFb_dtsg?(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>;
+  changeAvatar?(image: Uint8Array | Blob | AsyncIterable<Uint8Array>, caption?: string | number | ((error: Error | null, result?: Record<string, unknown>) => void), timestamp?: number | ((error: Error | null, result?: Record<string, unknown>) => void), callback?: (error: Error | null, result?: Record<string, unknown>) => void): Promise<Record<string, unknown>> | void;
+  changeGroupImage?(image: Uint8Array | Blob | AsyncIterable<Uint8Array>, threadID: string | number, callback?: (error: Error | null, result?: Record<string, unknown>) => void): Promise<Record<string, unknown>> | void;
+  sendMessage?(...args: unknown[]): unknown; editMessage?(text: string, messageID: string, callback?: (error: Error | null, result?: { body: string; messageID: string }) => void): Promise<{ body: string; messageID: string }> | void; shareContact?(text: string | null | undefined, senderID: string | number, threadID: string | number, callbackOrMessageID?: string | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void; httpPost?(url: string, form: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getUserInfo?(...args: unknown[]): unknown;
   getThreadInfo?(...args: unknown[]): unknown; getThreadList?(...args: unknown[]): unknown;
-  markAsRead?(...args: unknown[]): unknown; setMessageReaction?(...args: unknown[]): unknown;
+  markAsRead?(...args: unknown[]): unknown; markAsDelivered?(threadID: string | number, messageID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void; setMessageReaction?(...args: unknown[]): unknown;
   sendTypingIndicator?(...args: unknown[]): unknown; unsendMessage?(...args: unknown[]): unknown;
-  changeNickname?(...args: unknown[]): unknown; addUserToGroup?(...args: unknown[]): unknown;
+  changeNickname?(...args: unknown[]): unknown; changeThreadColor?(color: string, threadID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void; changeThreadEmoji?(emoji: string, threadID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void; setTitle?(title: string, threadID: string | number, callback?: (error?: Error | null, result?: unknown) => void): Promise<unknown> | void; addUserToGroup?(...args: unknown[]): unknown;
   removeUserFromGroup?(...args: unknown[]): unknown; createNewGroup?(...args: unknown[]): unknown;
   getThreadHistory?(...args: unknown[]): unknown; getMessage?(...args: unknown[]): unknown;
-  getFriendsList?(...args: unknown[]): unknown; getUserID?(...args: unknown[]): unknown;
+  getFriendsList?(...args: unknown[]): unknown; getUserID?(...args: unknown[]): unknown; getUID?(...args: unknown[]): unknown; resolvePhotoUrl?(...args: unknown[]): unknown;
   sessionGuard?(...args: unknown[]): unknown; stopSessionGuard?(): unknown;
   setOptions?(options: Record<string, unknown>): unknown;
 }
@@ -98,11 +101,13 @@ export interface LicenseOptions {
   checkIntervalMs?: number; refresh?: () => string | Promise<string>;
 }
 export interface ClientApi {
-  getCurrentUserID(): string | null; getUserID?(): string | null; getConnectionState(): ConnectionSnapshot; getLicense(): VerifiedLicense | null;
+  getCurrentUserID(): string | null; getCookies?(): string; getHumanizer?(): { enabled: boolean; setOptions(options: Record<string, unknown>): unknown; getOptions?(): Record<string, unknown> } | null; getAppState?(): Cookie[]; getUserID?(): string | null; getUserID?(name: string, callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; getUID?(input: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; resolvePhotoUrl?(photoID: string | number, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getFriendsList?(callback?: (error: Error | null, result?: Array<Record<string, unknown>>) => void): Promise<Array<Record<string, unknown>>> | void; createNewGroup?(participantIDs: Array<string | number>, groupTitle?: string | ((error: Error | null, result?: string) => void) | null, callback?: (error: Error | null, result?: string) => void): Promise<string> | void; getConnectionState(): ConnectionSnapshot; getLicense(): VerifiedLicense | null;
   getCapabilities(): Readonly<{ methods: readonly string[]; events: boolean; sessionGuard: boolean; e2ee: false }>;
   listen(callback: (event: unknown) => void): () => void;
   listenMqtt(callback: (error: Error | null, event?: unknown) => void): () => void;
   stopListening(callback?: () => void): boolean;
+  changeAvatar?: (image: Uint8Array | Blob | AsyncIterable<Uint8Array>, caption?: string | number | ((error: Error | null, result?: Record<string, unknown>) => void), timestamp?: number | ((error: Error | null, result?: Record<string, unknown>) => void), callback?: (error: Error | null, result?: Record<string, unknown>) => void) => Promise<Record<string, unknown>> | void;
+  changeGroupImage?: (image: Uint8Array | Blob | AsyncIterable<Uint8Array>, threadID: string | number, callback?: (error: Error | null, result?: Record<string, unknown>) => void) => Promise<Record<string, unknown>> | void;
   sendRequest?: (payload: Record<string, unknown>, options?: { timeoutMs?: number }) => Promise<unknown>; sendMessage?: { (input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; (message: string | { body?: string; sticker?: string | number }, threadID: string | number, callback: (error: Error | null, result?: unknown) => void, replyToMessageID?: string | number): void; }; getUserInfo?: (...args: any[]) => any;
   getThreadInfo?: (...args: any[]) => any; getThreadList?: (...args: any[]) => any;
   markAsRead?: (...args: any[]) => any; setMessageReaction?: (...args: any[]) => any;
@@ -110,7 +115,7 @@ export interface ClientApi {
   changeNickname?: (...args: any[]) => any; addUserToGroup?: (...args: any[]) => any;
   removeUserFromGroup?: (...args: any[]) => any; createNewGroup?: (...args: any[]) => any;
   getThreadHistory?: (...args: any[]) => any; getMessage?: (...args: any[]) => any;
-  getFriendsList?: (...args: any[]) => any; getUserID?: (...args: any[]) => any;
+  getFriendsList?: (...args: any[]) => any; getUserID?: (...args: any[]) => any; getUID?: (...args: any[]) => any; resolvePhotoUrl?: (...args: any[]) => any;
   sessionGuard?: (...args: any[]) => any; stopSessionGuard?: () => any;
   setOptions?: (options: Record<string, unknown>) => any;
 }
@@ -377,11 +382,12 @@ export function createMessengerSendMessageRequest(input: { threadID: string | nu
 export interface MessengerSyncCursorStore { load(): MessengerSyncCursor | null; save(cursor: MessengerSyncCursor): MessengerSyncCursor; clear(): void; readonly current: MessengerSyncCursor | null; }
 export function createMessengerSyncCursorStore(options: { filePath: string; key: string | Buffer | Uint8Array; userId: string | number }): MessengerSyncCursorStore;
 
-export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState: Cookie[]; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; }
-export function createFacebookMqttDriver(options: FacebookMqttDriverOptions): Promise<TransportDriver & { getCurrentUserID(): string; getSessionState(): "active"; sendRequest(payload: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<unknown>; sendMessage(input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; disconnect(): Promise<void>; }>;
+export interface FacebookMqttDriverOptions extends Omit<PersonalSessionOptions, "appState"> { appState?: Cookie[]; sessionGuard?: NativeDriverSessionGuardOptions; socketFactory(options: { url: string; protocols?: string | string[]; headers?: Record<string, string>; signal: AbortSignal }): unknown | Promise<unknown>; connectTimeoutMs?: number; closeTimeoutMs?: number; protocolSetupTimeoutMs?: number; maxFrameBytes?: number; syncCursorStore?: MessengerSyncCursorStore; onSyncCursor?: (cursor: MessengerSyncCursor) => void; requestTimeoutMs?: number; maxPendingRequests?: number; mqtt?: Record<string, unknown>; }
+export interface NativeDriverSessionGuardOptions extends Omit<SessionGuardOptions, "getSession"> { intervalMs?: number; }
+export function createFacebookMqttDriver(options: FacebookMqttDriverOptions): Promise<TransportDriver & { getCurrentUserID(): string; getAppState(): Cookie[]; getCookies(): string; refreshFb_dtsg(): Promise<Readonly<{ refreshedAt: number; tokenNames: readonly string[] }>>; getSessionState(): "active"; sendRequest(payload: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<unknown>; sendMessage(input: { threadID: string | number; message: string | { body?: string; sticker?: string | number }; replyToMessageID?: string | number }, options?: { timeoutMs?: number }): Promise<unknown>; sessionGuard(requestedPath?: string, options?: { interval?: number; debounce?: number }): Readonly<{ filePath: string; backupPath: string; saveNow(): Promise<string> }>; stopSessionGuard(): Promise<boolean>; disconnect(): Promise<void>; }>;
 export interface MessengerSyncCursor { syncToken: string | null; lastSeqId: string | number | null; }
 
-/** Creates the native AppState-only personal Messenger client; caller supplies WebSocket implementation. */
+/** Creates the native AppState/SessionGuard personal Messenger client; caller supplies WebSocket implementation. */
 export interface FacebookMqttClientOptions extends Omit<FacebookMqttDriverOptions, "appState"> {
   reconnect?: { minDelayMs?: number; maxDelayMs?: number; factor?: number; jitter?: number; maxAttempts?: number };
   license?: LicenseOptions;
@@ -391,8 +397,27 @@ export interface FacebookMqttClientOptions extends Omit<FacebookMqttDriverOption
 export function createFacebookMqttClient(options: FacebookMqttClientOptions): ReturnType<typeof createClient>;
 
 
+/** Encrypted session snapshots with verified backup preservation and corruption recovery. */
+export interface SessionGuardOptions {
+  filePath: string;
+  key: string | Buffer | Uint8Array;
+  getSession(): Record<string, unknown> | Promise<Record<string, unknown>>;
+  backupPath?: string;
+  onRecovery?: (event: Readonly<{ source: "backup" | "save"; restored: boolean; errorCode?: string }>) => void;
+}
+export interface SessionGuard {
+  saveNow(): Promise<string>;
+  load(): Record<string, unknown>;
+  start(intervalMs?: number): () => void;
+  stop(): void;
+  close(): void;
+  getPaths(): Readonly<{ filePath: string; backupPath: string }>;
+}
+export function createSessionGuard(options: SessionGuardOptions): SessionGuard;
+
 /** Personal-account thread and group actions following public FCA web request conventions. */
 export interface FacebookThreadApi {
+  httpPost(url: string, form: Record<string, unknown>, callback?: (error: Error | null, result?: string) => void): Promise<string> | void;
   getThreadList(limit: number, timestamp?: number | null, tags?: string[] | ((error: Error | null, result?: unknown[]) => void), callback?: (error: Error | null, result?: unknown[]) => void): Promise<unknown[]> | void;
   getThreadInfo(threadID: string | number, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   getThreadHistory(threadID: string | number, amount: number, timestamp?: number | null, callback?: (error: Error | null, result?: unknown[]) => void): Promise<unknown[]> | void;
@@ -402,6 +427,13 @@ export interface FacebookThreadApi {
   changeNickname(nickname: string, threadID: string | number, participantID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void;
   setMessageReaction(reaction: string, messageID: string, callback?: (error?: Error | null) => void): Promise<unknown> | void;
   markAsRead(threadID: string | number, read?: boolean | ((error?: Error | null) => void), callback?: (error?: Error | null) => void): Promise<unknown> | void;
+  markAsDelivered(threadID: string | number, messageID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void;
+  unsendMessage(messageID: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  changeThreadColor(color: string, threadID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void;
+  changeThreadEmoji(emoji: string, threadID: string | number, callback?: (error?: Error | null) => void): Promise<unknown> | void;
+  setTitle(title: string, threadID: string | number, callback?: (error?: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  sendTypingIndicator(threadID: string | number, typing?: boolean | ((error?: Error | null) => void), callback?: (error?: Error | null) => void): Promise<unknown> | void;
+  sendTypingIndicator(typ: 0 | 1, threadID: string | number, callback?: (error?: Error | null) => void, isGroup?: boolean): Promise<unknown> | void;
 }
 export const FACEBOOK_THREAD_DOC_IDS: Readonly<{ threadList: string; threadInfo: string; threadHistory: string; reaction: string }>;
 export function createFacebookThreadApi(options: { session: PersonalSession; webClient?: FacebookWebClient }): FacebookThreadApi;

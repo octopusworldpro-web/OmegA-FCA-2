@@ -287,10 +287,63 @@ async function createPersonalSession({
     }
 
     const pageUserId = extractIdentity(html);
-    const pageTokens = extractFacebookTokens(html);
+    let pageTokens = extractFacebookTokens(html);
     const realtime = extractRealtimeConfig(html);
     if (pageUserId && pageUserId !== userId) {
       throw sessionError("Facebook returned a different account than the supplied c_user session", "FCA_SESSION_IDENTITY_MISMATCH", "error");
+    }
+
+    async function refreshTokens() {
+      if (closed) throw new Error("Facebook session is closed");
+      const refreshController = new AbortController();
+      const refreshTimer = setTimeout(() => refreshController.abort(new Error("Facebook token refresh timed out")), timeoutMs);
+      try {
+        const target = new URL("/", FACEBOOK_ORIGIN);
+        const response = await fetchImpl(target, {
+          method: "GET",
+          redirect: "manual",
+          headers: {
+            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "accept-language": "en-US,en;q=0.9",
+            cookie: jar.getCookieHeader(target),
+            "user-agent": userAgent
+          },
+          signal: refreshController.signal
+        });
+        const { accepted, deletions } = collectResponseCookies(response, target);
+        if (accepted.length) jar.setCookies(accepted);
+        if (deletions.length) jar.deleteCookies(deletions);
+        const declaredLength = Number(response.headers?.get?.("content-length") || 0);
+        if (declaredLength > MAX_RESPONSE_BYTES) {
+          throw sessionError("Facebook token refresh response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
+        }
+        const refreshedHtml = await response.text();
+        if (Buffer.byteLength(refreshedHtml, "utf8") > MAX_RESPONSE_BYTES) {
+          throw sessionError("Facebook token refresh response exceeded the safety limit", "FCA_RESPONSE_TOO_LARGE", "error");
+        }
+        const state = detectSessionChallenge(response, refreshedHtml);
+        if (state === "checkpoint") throw sessionError("Facebook requires the account owner to complete a checkpoint", "FCA_CHECKPOINT_REQUIRED", state);
+        if (state === "logged_out" || response.status === 401 || response.status === 403) {
+          throw sessionError("The supplied Facebook AppState is expired or not authenticated", "FCA_SESSION_EXPIRED", "logged_out");
+        }
+        if (!response.ok) throw sessionError("Facebook token refresh failed with HTTP " + response.status, "FCA_TOKEN_REFRESH_FAILED", "error");
+        const refreshed = extractFacebookTokens(refreshedHtml);
+        if (!refreshed.fbDtsg) {
+          throw sessionError("Facebook did not return a usable fb_dtsg token", "FCA_TOKEN_REFRESH_FAILED", "error");
+        }
+        pageTokens = refreshed;
+        return Object.freeze({
+          refreshedAt: Date.now(),
+          tokenNames: Object.freeze(Object.keys(refreshed).filter(key => Boolean(refreshed[key])))
+        });
+      } catch (error) {
+        if (error?.name === "AbortError" || refreshController.signal.aborted) {
+          throw sessionError("Facebook token refresh timed out", "FCA_SESSION_TIMEOUT", "error");
+        }
+        throw error;
+      } finally {
+        clearTimeout(refreshTimer);
+      }
     }
 
     return Object.freeze({
@@ -302,6 +355,7 @@ async function createPersonalSession({
         if (closed) throw new Error("Facebook session is closed");
         return { ...pageTokens };
       },
+      refreshTokens,
       getCookieHeader(url = FACEBOOK_ORIGIN + "/") {
         if (closed) throw new Error("Facebook session is closed");
         const target = url instanceof URL ? url : new URL(url);

@@ -7,9 +7,9 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [main, public-package]
+    branches: [main, public-package, "prerelease/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "prerelease/**"]
 
 jobs:
   test:
@@ -28,6 +28,6 @@ jobs:
       - run: npm run test:syntax
       - name: Smoke-test package root exports
         run: |
-          node -e 'const p=require("./"); for (const k of ["createClient","createGoatBotLogin","createMetaMessengerTransport","verifyWebhookSignature"]) if (typeof p[k] !== "function") throw new Error("Missing export "+k)'
+          node -e 'const p=require("./"); for (const k of ["createClient","createGoatBotLogin","createFacebookMqttClient","createFacebookMqttDriver","createSessionGuard","createMetaMessengerTransport","verifyWebhookSignature"]) if (typeof p[k] !== "function") throw new Error("Missing export "+k)'
       - name: Verify publishable package contents
         run: npm pack --dry-run --json

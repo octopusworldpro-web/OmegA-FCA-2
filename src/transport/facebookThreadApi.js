@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomInt } = require("node:crypto");
+const { offlineThreadingId } = require("./messengerActions");
 const { createFacebookWebClient } = require("../auth/facebookWebClient");
 const { createFacebookError } = require("../auth/facebookResponse");
 
@@ -10,6 +12,16 @@ const REMOVE_URL = "https://www.facebook.com/chat/remove_participants";
 const NICKNAME_URL = "https://www.facebook.com/messaging/save_thread_nickname/?source=thread_settings&dpr=1";
 const REACTION_URL = "https://www.facebook.com/webgraphql/mutation/";
 const READ_URL = "https://www.facebook.com/ajax/mercury/change_read_status.php";
+const UNSEND_URL = "https://www.facebook.com/messaging/unsend_message/";
+const TITLE_URL = "https://www.facebook.com/messaging/set_thread_name/";
+const COLOR_URL = "https://www.facebook.com/messaging/save_thread_color/?source=thread_settings&dpr=1";
+const EMOJI_URL = "https://www.facebook.com/messaging/save_thread_emoji/?source=thread_settings&dpr=1";
+const TYPING_URL = "https://www.facebook.com/ajax/messaging/typ.php";
+const TYPEAHEAD_URL = "https://www.facebook.com/ajax/typeahead/search.php";
+const PHOTO_URL = "https://www.facebook.com/mercury/attachments/photo";
+const FRIENDS_URL = "https://www.facebook.com/chat/user_info_all";
+const GRAPHQL_URL = "https://www.facebook.com/api/graphql/";
+const DELIVERY_URL = "https://www.facebook.com/ajax/mercury/delivery_receipts.php";
 
 // Public FCA document IDs. Facebook changes private web query IDs without notice.
 const DOC_IDS = Object.freeze({
@@ -126,7 +138,7 @@ function unwrapGraph(response, operation) {
   return result?.data ?? result;
 }
 
-function createFacebookThreadApi({ session, webClient } = {}) {
+function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } = {}) {
   if (!session || typeof session.request !== "function") throw new TypeError("An active personal session is required");
   const web = webClient || createFacebookWebClient({ session });
   const currentUserID = id(session.userId, "session.userId");
@@ -137,6 +149,22 @@ function createFacebookThreadApi({ session, webClient } = {}) {
       queries: JSON.stringify({ o0: { doc_id: docId, query_params: queryParams } })
     });
     return unwrapGraph(payload, operation);
+  }
+
+  function httpPost(url, form, callback) {
+    if (typeof form === "function") { callback = form; form = {}; }
+    if (!form || typeof form !== "object" || Array.isArray(form)) {
+      throw new TypeError("httpPost form must be an object");
+    }
+    const operation = web.post(url, form).then(result => {
+      if (typeof result.raw !== "string") {
+        throw createFacebookError("httpPost: response body was not available", {
+          code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false
+        });
+      }
+      return result.raw;
+    });
+    return callbackResult(operation, callback);
   }
 
   function getThreadList(limit, timestamp = null, tags = [], callback) {
@@ -190,6 +218,159 @@ function createFacebookThreadApi({ session, webClient } = {}) {
       return nodes.map(message => formatMessage(message, thread, isGroup)).filter(message => message.messageID);
     })();
     return callbackResult(operation, callback);
+  }
+
+  function getMessage(threadID, messageID, callback) {
+    const thread = id(threadID, "threadID");
+    if (typeof messageID !== "string" || !messageID.trim() || messageID.length > 256) {
+      throw new TypeError("messageID is invalid");
+    }
+    const target = messageID.trim();
+    const operation = getThreadHistory(thread, 100, null).then(messages =>
+      messages.find(message => message.messageID === target) ?? null
+    );
+    return callbackResult(operation, callback);
+  }
+
+  function getUserID(name, callback) {
+    if (typeof name !== "string" || !name.trim() || name.length > 256) throw new TypeError("name is invalid");
+    const value = name.trim().toLowerCase();
+    const operation = web.get(TYPEAHEAD_URL, {
+      query: { value, viewer: session.userId, rsp: "search", context: "search", path: "/home.php", request_id: clientId }
+    }).then(result => {
+      const payload = object(result?.payload);
+      if (payload.error) throw createFacebookError("getUserID: Facebook rejected the search", { code: "FCA_FACEBOOK_REQUEST_REJECTED" });
+      const entries = Array.isArray(payload.payload?.entries) ? payload.payload.entries :
+        (Array.isArray(payload.entries) ? payload.entries : []);
+      return entries.map(entry => ({
+        userID: id(entry.uid, "userID"),
+        photoUrl: entry.photo || null,
+        indexRank: entry.index_rank ?? null,
+        name: entry.text || null,
+        isVerified: Boolean(entry.is_verified),
+        profileUrl: entry.path || null,
+        category: entry.category || null,
+        score: entry.score ?? null,
+        type: entry.type || null
+      }));
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function getUID(input, callback) {
+    const raw = String(input ?? "").trim();
+    if (!raw || raw.length > 2048) throw new TypeError("profile input is invalid");
+    if (/^\d{5,30}$/.test(raw)) return callbackResult(Promise.resolve(raw), callback);
+    let username = raw;
+    const lowerRaw = raw.toLowerCase();
+    if (lowerRaw.startsWith("http://") || lowerRaw.startsWith("https://") || lowerRaw.includes("facebook.com")) {
+      let parsed;
+      try {
+        const candidate = lowerRaw.startsWith("http://") || lowerRaw.startsWith("https://") ? raw : "https://" + raw;
+        parsed = new URL(candidate);
+      } catch { throw new TypeError("profile URL is invalid"); }
+      if (!(parsed.hostname.toLowerCase() === "facebook.com" || parsed.hostname.toLowerCase().endsWith(".facebook.com"))) {
+        throw new TypeError("profile URL must belong to facebook.com");
+      }
+      if (parsed.pathname.toLowerCase() === "/profile.php") {
+        const direct = parsed.searchParams.get("id");
+        if (direct && /^\d{5,30}$/.test(direct)) return callbackResult(Promise.resolve(direct), callback);
+      }
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const last = parts.at(-1) || "";
+      if (/^\d{5,30}$/.test(last)) return callbackResult(Promise.resolve(last), callback);
+      username = parts[0] === "people" ? (parts[1] || "") : (parts[0] || "");
+    }
+    if (!username || username.includes("/") || username.length > 128) throw new TypeError("profile username is invalid");
+    const operation = getUserID(username).then(entries => {
+      const first = entries[0]?.userID;
+      if (!first) {
+        const error = new Error("Facebook profile could not be resolved");
+        error.code = "FCA_USER_NOT_FOUND";
+        throw error;
+      }
+      return first;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function resolvePhotoUrl(photoID, callback) {
+    const photo = String(photoID ?? "").trim();
+    if (!photo || photo.length > 256) throw new TypeError("photoID is invalid");
+    const operation = web.get(PHOTO_URL, { query: { photo_id: photo } }).then(result => {
+      if (result?.payload?.error) throw createFacebookError("resolvePhotoUrl: Facebook rejected the photo lookup", { code: "FCA_FACEBOOK_REQUEST_REJECTED" });
+      const value = result?.payload?.jsmods?.require?.[0]?.[3]?.[0];
+      if (!value) return "";
+      let parsed;
+      try { parsed = new URL(String(value)); } catch { throw new Error("Facebook returned an invalid photo URL"); }
+      if (parsed.protocol !== "https:" || !/(^|\.)(?:fbcdn\.net|facebook\.com|fbsbx\.com)$/i.test(parsed.hostname)) {
+        throw new Error("Facebook returned a photo URL outside the approved CDN hosts");
+      }
+      return parsed.toString();
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function getFriendsList(callback) {
+    const operation = web.post(FRIENDS_URL, {}, { query: { viewer: session.userId } }).then(result => {
+      const payload = object(result?.payload?.payload ?? result?.payload);
+      if (payload.error) throw createFacebookError("getFriendsList: Facebook rejected the friend-list request", { code: "FCA_FACEBOOK_REQUEST_REJECTED" });
+      const values = Array.isArray(payload) ? payload : Object.values(payload);
+      const genders = ["unknown", "female_singular", "male_singular", "female_singular_guess", "male_singular_guess", "mixed", "neuter_singular", "unknown_singular", "female_plural", "male_plural", "neuter_plural", "unknown_plural"];
+      return values.filter(user => user && typeof user === "object").map(user => ({
+        alternateName: user.alternateName || null,
+        firstName: user.firstName || null,
+        gender: genders[Number(user.gender)] || "unknown",
+        userID: user.id == null ? "" : String(user.id),
+        isFriend: Boolean(user.is_friend),
+        fullName: user.name || null,
+        profilePicture: user.thumbSrc || null,
+        type: user.type || null,
+        profileUrl: user.uri || null,
+        vanity: user.vanity || null,
+        isBirthday: Boolean(user.is_birthday)
+      }));
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function createNewGroup(participantIDs, groupTitle, callback) {
+    let title = groupTitle;
+    let done = callback;
+    if (typeof title === "function") { done = title; title = null; }
+    if (!Array.isArray(participantIDs) || participantIDs.length < 2 || participantIDs.length > 250) {
+      throw new TypeError("participantIDs must contain 2-250 Facebook IDs");
+    }
+    const participants = participantIDs.map(value => ({ fbid: id(value, "participantID") }));
+    if (!participants.some(value => value.fbid === session.userId)) participants.push({ fbid: session.userId });
+    if (title != null && (typeof title !== "string" || title.length > 100)) throw new TypeError("groupTitle must be a string up to 100 characters");
+    const form = {
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "MessengerGroupCreateMutation",
+      av: session.userId,
+      doc_id: "577041672419534",
+      variables: JSON.stringify({
+        input: {
+          entry_point: "jewel_new_group",
+          actor_id: session.userId,
+          participants,
+          client_mutation_id: String(randomInt(1, 1025)),
+          thread_settings: {
+            name: typeof title === "string" ? title : null,
+            joinable_mode: "PRIVATE",
+            thread_image_fbid: null
+          }
+        }
+      })
+    };
+    const operation = web.post(GRAPHQL_URL, form).then(result => {
+      const payload = object(result?.payload);
+      if (payload.errors?.length) throw createFacebookError("createNewGroup: Facebook rejected the group creation", { code: "FCA_FACEBOOK_REQUEST_REJECTED" });
+      const threadID = payload.data?.messenger_group_thread_create?.thread?.thread_key?.thread_fbid;
+      if (!threadID) throw new Error("Facebook returned an invalid createNewGroup response");
+      return String(threadID);
+    });
+    return callbackResult(operation, done);
   }
 
   function getUserInfo(ids, callback) {
@@ -267,6 +448,157 @@ function createFacebookThreadApi({ session, webClient } = {}) {
     return callbackResult(operation, callback);
   }
 
+  function setTitle(newTitle, threadID, callback) {
+    if (typeof newTitle !== "string" || newTitle.length > 100) throw new TypeError("newTitle must be a string up to 100 characters");
+    const thread = id(threadID, "threadID");
+    const timestamp = Date.now();
+    const offlineId = offlineThreadingId(timestamp);
+    const threadingId = "<" + timestamp + ":" + randomInt(0, 0xffffffff) + "-" + String(clientId) + "@mail.projektitan.com>";
+    const body = {
+      client: "mercury", action_type: "ma-type:log-message",
+      author: "fbid:" + currentUserID, author_email: "", coordinates: "",
+      timestamp, timestamp_absolute: "Today", timestamp_relative: "0",
+      timestamp_time_passed: "0", is_unread: false, is_cleared: false,
+      is_forward: false, is_filtered_content: false, is_spoof_warning: false,
+      source: "source:chat:web", "source_tags[0]": "source:chat", status: "0",
+      offline_threading_id: offlineId, message_id: offlineId,
+      threading_id: threadingId, manual_retry_cnt: "0",
+      thread_fbid: thread, thread_name: newTitle, thread_id: thread,
+      log_message_type: "log:thread-name"
+    };
+    const operation = web.post(TITLE_URL, body).then(result => {
+      const error = result.payload?.error;
+      if (error) {
+        const message = error === 1545012 ? "Cannot change chat title: not a member of the chat"
+          : error === 1545003 ? "Cannot set title of a one-to-one chat"
+          : "Facebook rejected the thread title update";
+        throw createFacebookError("setTitle: " + message, { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return { threadID: thread };
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function changeThreadColor(color, threadID, callback) {
+    if (typeof color !== "string" || color.length > 64) throw new TypeError("color must be a theme ID, hex color, or empty string");
+    const thread = id(threadID, "threadID");
+    const normalized = color === "196241301102133" || color.toLowerCase() === "#0084ff" ? "" : color;
+    const operation = web.post(COLOR_URL, { color_choice: normalized, thread_or_other_fbid: thread }).then(result => {
+      if (!result.payload || result.payload.error) {
+        throw createFacebookError("changeThreadColor: Facebook rejected the color update", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function changeThreadEmoji(emoji, threadID, callback) {
+    if (typeof emoji !== "string" || emoji.length > 16) throw new TypeError("emoji must be a string up to 16 characters");
+    const thread = id(threadID, "threadID");
+    const operation = web.post(EMOJI_URL, { emoji_choice: emoji, thread_or_other_fbid: thread }).then(result => {
+      if (!result.payload || result.payload.error) {
+        throw createFacebookError("changeThreadEmoji: Facebook rejected the emoji update", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function sendTypingIndicator(first, second, third, fourth) {
+    let threadID;
+    let typing;
+    let callback;
+    let isGroup;
+    let returnStopHandle = false;
+    // Support both the native ergonomic signature (threadID, boolean, cb)
+    // and legacy FCA's (typ, threadID, cb, isGroup) call convention.
+    if ((first === 0 || first === 1 || typeof first === "boolean") &&
+        (typeof second === "string" || typeof second === "number")) {
+      typing = Boolean(first);
+      threadID = second;
+      callback = third;
+      isGroup = fourth;
+    } else {
+      threadID = first;
+      if (typeof second === "function") {
+        typing = true;
+        callback = second;
+        returnStopHandle = true;
+      } else {
+        typing = second === undefined ? true : second;
+        callback = third;
+        returnStopHandle = second === undefined;
+      }
+    }
+    if (typeof typing !== "boolean") throw new TypeError("typing must be a boolean or legacy 0/1 value");
+    const thread = id(threadID, "threadID");
+    const body = { typ: typing ? 1 : 0, to: "", source: "mercury-chat", thread };
+    const operation = (async () => {
+      if (typeof isGroup === "boolean") {
+        if (!isGroup) body.to = thread;
+      } else {
+        const profiles = await getUserInfo(thread);
+        if (Object.keys(profiles || {}).length > 0) body.to = thread;
+      }
+      const result = await web.post(TYPING_URL, body);
+      if (!result.payload || result.payload.error) {
+        throw createFacebookError("sendTypingIndicator: Facebook rejected the typing update", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      if (!returnStopHandle || !typing) return result.payload;
+      let stopPromise = null;
+      return function endTyping(endCallback) {
+        if (!stopPromise) {
+          stopPromise = web.post(TYPING_URL, { ...body, typ: 0 }).then(stopResult => {
+            if (!stopResult.payload || stopResult.payload.error) {
+              throw createFacebookError("sendTypingIndicator: Facebook rejected the typing stop request", {
+                code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+              });
+            }
+            return stopResult.payload;
+          });
+        }
+        return callbackResult(stopPromise, endCallback);
+      };
+    })();
+    return callbackResult(operation, callback);
+  }
+
+  function unsendMessage(messageID, callback) {
+    if (typeof messageID !== "string" || !messageID || messageID.length > 256) {
+      throw new TypeError("messageID is invalid");
+    }
+    const operation = web.post(UNSEND_URL, { message_id: messageID }).then(result => {
+      if (!result.payload || result.payload.error) {
+        throw createFacebookError("unsendMessage: Facebook rejected the unsend request", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
+  function markAsDelivered(threadID, messageID, callback) {
+    const thread = id(threadID, "threadID");
+    if (typeof messageID !== "string" || !messageID.trim() || messageID.length > 256 || messageID.split("").some(character => character.charCodeAt(0) < 32)) throw new TypeError("messageID is invalid");
+    const message = messageID.trim();
+    const body = {
+      "message_ids[0]": message,
+      ["thread_ids[" + thread + "][0]"]: message
+    };
+    const operation = web.post(DELIVERY_URL, body).then(result => {
+      if (!result.payload || result.payload.error) {
+        throw createFacebookError("markAsDelivered: Facebook rejected the delivery receipt", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      return result.payload;
+    });
+    return callbackResult(operation, callback);
+  }
+
   function markAsRead(threadID, read = true, callback) {
     if (typeof read === "function") { callback = read; read = true; }
     if (typeof read !== "boolean") throw new TypeError("read must be a boolean");
@@ -277,8 +609,8 @@ function createFacebookThreadApi({ session, webClient } = {}) {
     return callbackResult(operation, callback);
   }
 
-  return Object.freeze({ getThreadList, getThreadInfo, getThreadHistory, getUserInfo,
-    addUserToGroup, removeUserFromGroup, changeNickname, setMessageReaction, markAsRead });
+  return Object.freeze({ httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo,
+    addUserToGroup, removeUserFromGroup, changeNickname, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, markAsRead, markAsDelivered, unsendMessage, sendTypingIndicator });
 }
 
 module.exports = { createFacebookThreadApi, DOC_IDS };

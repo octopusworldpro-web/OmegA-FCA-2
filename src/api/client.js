@@ -7,17 +7,17 @@ const { validateTransportDriver } = require("../transport/contract");
 const { classifySessionState } = require("../security/sessionState");
 
 const METHOD_FEATURES = Object.freeze({
-  sendMessage: "messaging", sendRequest: "messaging", unsendMessage: "messaging", markAsRead: "messaging", sendTypingIndicator: "messaging",
-  getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads", getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads", getUserID: "threads",
+  sendMessage: "messaging", editMessage: "messaging", shareContact: "messaging", sendRequest: "messaging", unsendMessage: "messaging", markAsRead: "messaging", sendTypingIndicator: "messaging",
+  getUserInfo: "threads", getThreadInfo: "threads", getThreadList: "threads", getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads", getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads", createNewGroup: "groups",
   addUserToGroup: "groups", removeUserFromGroup: "groups", createNewGroup: "groups", changeNickname: "groups",
   setMessageReaction: "reactions"
 });
 
 const DRIVER_METHODS = [
-  "sendRequest", "sendMessage", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID",
-  "markAsRead", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
-  "changeNickname", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
-  "getThreadHistory", "getMessage", "getFriendsList", "getUserID"
+  "sendRequest", "sendMessage", "editMessage", "shareContact", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
+  "markAsRead", "markAsDelivered", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
+  "changeNickname", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
+  "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl", "createNewGroup"
 ];
 
 function createClient({ authenticate, options = {}, reconnect = {}, license = {}, requireLicense = false, onLicenseError = () => {} } = {}) {
@@ -88,10 +88,12 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
       normalized = validateSessionCookies(credentials.appState);
     } else if (mode === "cookie") {
       normalized = validateSessionCookies(parseCookieHeader(credentials.cookie));
+    } else if (mode === "session") {
+      normalized = null;
     } else if (mode === "credentials") {
-      throw new TypeError("Facebook email/username and password login is deferred; use an authorized AppState or cookie");
+      throw new TypeError("Facebook email/username and password login is deferred; use an authorized AppState or encrypted session");
     } else {
-      throw new TypeError("Login mode must be appstate or cookie");
+      throw new TypeError("Login mode must be appstate, cookie, or session");
     }
 
     let lastConnectError = null;
@@ -120,7 +122,9 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
               ? "The Facebook session has expired; supply a fresh authorized AppState"
               : isRealtimeFailure
                 ? "Facebook session was accepted, but Messenger realtime setup failed (" + safeProviderCode + ")"
-                : "Authentication failed; inspect provider diagnostics securely");
+                : safeProviderCode === "FCA_SESSION_GUARD_MISSING" || safeProviderCode === "FCA_SESSION_SNAPSHOT_MISSING" || safeProviderCode === "FCA_SESSION_RESTORE_FAILED"
+                  ? "No usable encrypted saved Facebook session is available; supply AppState or configure SessionGuard"
+                  : "Authentication failed; inspect provider diagnostics securely");
           if (sessionState === "checkpoint") {
             error.code = "FCA_CHECKPOINT_REQUIRED";
             error.sessionState = sessionState;

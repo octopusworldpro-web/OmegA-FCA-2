@@ -225,3 +225,21 @@ test("personal session refuses redirects outside Facebook/Messenger HTTPS", asyn
     error => error.code === "FCA_UNEXPECTED_REDIRECT"
   );
 });
+
+test("personal session refreshes fb_dtsg and returns only non-secret token metadata", async () => {
+  let calls = 0;
+  const html = token => '<html><script>{"USER_ID":"123456789012345"}</script><input name="fb_dtsg" value="' + token + '"><input name="lsd" value="lsd-' + token + '"></html>';
+  const session = await createPersonalSession({
+    appState,
+    fetchImpl: async () => {
+      calls++;
+      return response({ html: html(calls === 1 ? "old-token" : "new-token") });
+    }
+  });
+  assert.equal(session.getTokens().fbDtsg, "old-token");
+  const result = await session.refreshTokens();
+  assert.equal(session.getTokens().fbDtsg, "new-token");
+  assert.equal(result.tokenNames.includes("fbDtsg"), true);
+  assert.equal(JSON.stringify(result).includes("new-token"), false);
+  session.close();
+});

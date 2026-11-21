@@ -79,3 +79,41 @@ test("first-party client logs in with AppState and exposes callback-compatible M
 test("first-party client supplies its package-managed WebSocket implementation by default", () => {
   assert.doesNotThrow(() => createFacebookMqttClient());
 });
+
+
+test("forwards login-time listener options into the native MQTT driver", async () => {
+  const socket = new FakeSocket();
+  const client = createFacebookMqttClient({
+    socketFactory: () => socket,
+    fetchImpl: async () => response(),
+    mqtt: { keepAlive: 0 }
+  });
+  const api = await client.login({ mode: "appstate", appState }, {
+    listenTyping: true,
+    listenEvents: true,
+    updatePresence: true,
+    selfListen: false
+  });
+  const received = [];
+  const detach = api.listenMqtt((error, event) => {
+    if (error) throw error;
+    if (event?.type === "typ") received.push(event);
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  socket.emit("message", mqtt.encodePublish({
+    topic: "/t_ms",
+    payload: JSON.stringify({ deltas: [{
+      class: "TypingNotification",
+      messageMetadata: {
+        threadKey: { threadFbId: "987654321" },
+        actorFbId: "111111111111111"
+      },
+      isTyping: true
+    }] }),
+    qos: 1, packetId: 11
+  }));
+  assert.equal(received.length, 1);
+  assert.equal(received[0].type, "typ");
+  detach();
+  await client.logout();
+});

@@ -1,33 +1,144 @@
 "use strict";
 
+const path = require("node:path");
 const { createPersonalSession } = require("../auth/personalSession");
+const { createSessionGuard } = require("../security/sessionGuard");
 const { createFacebookMqttProtocol } = require("./facebookMqttProtocol");
 const { createNativeRealtimeTransport } = require("./nativeRealtimeTransport");
 const { createFacebookThreadApi } = require("./facebookThreadApi");
+const { createFacebookWebClient } = require("../auth/facebookWebClient");
+const { readImageInput } = require("../compat/imageUpload");
+const { createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
+const { createHumanizer } = require("../compat/humanizer");
 
 /**
  * Builds an owner-authorized personal Messenger MQTT driver.
  * Thread and group methods use the same authenticated Facebook web session
  * and public FCA request conventions; their private endpoints can change.
  */
+function extractEditMessageResult(response) {
+  const step = response?.payload?.step;
+  const candidate = step?.[1]?.[2]?.[2]?.[1];
+  const messageID = String(candidate?.[2] || "");
+  const body = String(candidate?.[4] || "");
+  if (!messageID || !body) {
+    const error = new Error("Facebook returned an invalid edit-message response");
+    error.code = "FCA_RESPONSE_SHAPE_INVALID";
+    throw error;
+  }
+  return { body, messageID };
+}
+
+function callbackResult(operation, callback) {
+  if (typeof callback !== "function") return operation;
+  operation.then(value => callback(null, value), error => callback(error));
+  return undefined;
+}
+
 async function createFacebookMqttDriver({
   appState, socketFactory, fetchImpl, userAgent, timeoutMs = 20000,
   connectTimeoutMs = 15000, closeTimeoutMs = 3000, protocolSetupTimeoutMs = 15000,
   maxFrameBytes, syncCursorStore, onSyncCursor, requestTimeoutMs, maxPendingRequests,
-  mqtt = {}, onDiagnostic
+  mqtt = {}, onDiagnostic, sessionGuard: sessionGuardOptions, options: loginOptions = {}
 } = {}) {
   if (typeof socketFactory !== "function") throw new TypeError("socketFactory is required");
-  const session = await createPersonalSession({ appState, fetchImpl, userAgent, timeoutMs, onDiagnostic });
+  let session = null;
   let closed = false;
   let transport;
+  let guard = null;
+  if (!loginOptions || typeof loginOptions !== "object" || Array.isArray(loginOptions)) {
+    throw new TypeError("login options must be an object");
+  }
+  const effectiveUserAgent = userAgent || loginOptions.userAgent || undefined;
+  const runtimeOptions = {
+    logLevel: loginOptions.logLevel || "warn",
+    selfListen: loginOptions.selfListen === true,
+    selfListenEvent: loginOptions.selfListenEvent === true,
+    listenEvents: loginOptions.listenEvents === true,
+    listenTyping: loginOptions.listenTyping === true,
+    updatePresence: loginOptions.updatePresence === true,
+    autoMarkDelivery: loginOptions.autoMarkDelivery === true,
+    autoMarkRead: loginOptions.autoMarkRead === true
+  };
+  let humanizer = null;
+  for (const key of ["selfListen", "selfListenEvent", "listenEvents", "listenTyping", "updatePresence", "autoMarkDelivery", "autoMarkRead"]) {
+    if (loginOptions[key] !== undefined && typeof loginOptions[key] !== "boolean") {
+      throw new TypeError(key + " must be a boolean");
+    }
+  }
+  if (loginOptions.proxy) {
+    const error = new TypeError("Native Messenger transport does not support proxy login options yet");
+    error.code = "FCA_OPTION_UNSUPPORTED";
+    throw error;
+  }
   try {
+    if (sessionGuardOptions != null) {
+      if (!sessionGuardOptions || typeof sessionGuardOptions !== "object" ||
+          typeof sessionGuardOptions.filePath !== "string" || !sessionGuardOptions.filePath.trim() ||
+          !(typeof sessionGuardOptions.key === "string" || Buffer.isBuffer(sessionGuardOptions.key) || sessionGuardOptions.key instanceof Uint8Array)) {
+        throw new TypeError("sessionGuard requires filePath and an explicit 32-byte/64-hex encryption key");
+      }
+      const keyIsValid = typeof sessionGuardOptions.key === "string"
+        ? /^[a-f0-9]{64}$/i.test(sessionGuardOptions.key)
+        : sessionGuardOptions.key.byteLength === 32;
+      if (!keyIsValid) throw new TypeError("Session encryption key must be 32 bytes or exactly 64 hexadecimal characters");
+      const accountFile = path.resolve(process.cwd(), "account.txt");
+      const encryptedFile = path.resolve(sessionGuardOptions.filePath);
+      const backupFile = path.resolve(sessionGuardOptions.backupPath || encryptedFile + ".bak");
+      if (encryptedFile === accountFile || backupFile === accountFile) {
+        throw new TypeError("Encrypted SessionGuard files must be separate from GoatBot account.txt");
+      }
+      guard = createSessionGuard({
+        filePath: sessionGuardOptions.filePath,
+        backupPath: sessionGuardOptions.backupPath,
+        key: sessionGuardOptions.key,
+        onRecovery: sessionGuardOptions.onRecovery,
+        getSession: () => {
+          if (!session) throw new Error("Facebook session is not initialized");
+          return { version: 1, userId: session.userId, appState: session.getAppState(), savedAt: Date.now() };
+        }
+      });
+    }
+    let activeAppState = appState;
+    let restoredSnapshot = null;
+    if (!Array.isArray(activeAppState) || activeAppState.length === 0) {
+      if (!guard) {
+        const error = new Error("No encrypted saved session is configured; supply AppState or configure SessionGuard");
+        error.code = "FCA_SESSION_GUARD_MISSING";
+        error.retryable = false;
+        throw error;
+      }
+      try { restoredSnapshot = guard.load(); }
+      catch (cause) {
+        const error = new Error("No usable encrypted saved session was found; supply a fresh AppState or repair the SessionGuard snapshot");
+        error.code = cause?.code === "ENOENT" ? "FCA_SESSION_SNAPSHOT_MISSING" : "FCA_SESSION_RESTORE_FAILED";
+        error.retryable = false;
+        throw error;
+      }
+      if (!Array.isArray(restoredSnapshot.appState) || restoredSnapshot.appState.length === 0) {
+        const error = new Error("Encrypted SessionGuard snapshot does not contain an AppState cookie array");
+        error.code = "FCA_SESSION_RESTORE_FAILED";
+        error.retryable = false;
+        throw error;
+      }
+      activeAppState = restoredSnapshot.appState;
+    }
+    session = await createPersonalSession({ appState: activeAppState, fetchImpl, userAgent: effectiveUserAgent, timeoutMs, onDiagnostic });
+    if (restoredSnapshot?.userId != null && String(restoredSnapshot.userId) !== session.userId) {
+      const error = new Error("Restored Facebook session identity does not match the encrypted snapshot");
+      error.code = "FCA_SESSION_IDENTITY_MISMATCH";
+      error.retryable = false;
+      throw error;
+    }
+    const webClient = createFacebookWebClient({ session });
     const protocolConfig = createFacebookMqttProtocol({
       ...mqtt, userId: session.userId,
       url: mqtt.url || session.realtime.endpoint || undefined,
       region: mqtt.region || session.realtime.region || undefined,
       lastSeqId: mqtt.lastSeqId || session.realtime.lastSeqId || undefined,
       cookie: session.getCookieHeader("https://edge-chat.facebook.com/chat"),
-      userAgent, syncCursorStore, onSyncCursor, requestTimeoutMs, maxPendingRequests
+      userAgent: effectiveUserAgent, syncCursorStore, onSyncCursor, requestTimeoutMs, maxPendingRequests,
+      online: loginOptions.online ?? mqtt.online
     });
     transport = createNativeRealtimeTransport({
       url: protocolConfig.url, headers: protocolConfig.headers, socketFactory,
@@ -37,22 +148,245 @@ async function createFacebookMqttDriver({
     });
     await transport.connect();
     const driver = transport.getDriver();
-    const threadApi = createFacebookThreadApi({ session });
+    if (guard) {
+      await guard.saveNow();
+      guard.start(sessionGuardOptions.intervalMs === undefined ? 60_000 : sessionGuardOptions.intervalMs);
+    }
+    const threadApi = createFacebookThreadApi({ session, clientId: protocolConfig.session.clientId, webClient });
+    const stopSessionGuard = async () => {
+      if (!guard) return false;
+      const active = guard;
+      guard = null;
+      active.stop();
+      try {
+        await active.saveNow();
+        return true;
+      } catch (error) {
+        // GoatBot's historical caller does not await this method in every
+        // shutdown/recovery path. Resolve safely rather than leaking an
+        // unhandled rejection while still closing the guard deterministically.
+        try {
+          if (typeof sessionGuardOptions.onRecovery === "function") {
+            sessionGuardOptions.onRecovery(Object.freeze({
+              source: "save", restored: false,
+              errorCode: error.code || "FCA_SESSION_GUARD_SAVE_FAILED"
+            }));
+          }
+        } catch {}
+        return false;
+      } finally {
+        active.close();
+      }
+    };
     return Object.freeze({
       ...driver,
       ...threadApi,
+      listen: callback => {
+        if (typeof callback !== "function") throw new TypeError("listener callback is required");
+        if (!humanizer) humanizer = createHumanizer({
+          sendTypingIndicator: (threadID, isTyping) => threadApi.sendTypingIndicator(threadID, isTyping)
+        });
+        const detach = driver.listen((error, event) => {
+          if (error || !event || typeof event !== "object") {
+            if (humanizer) humanizer.stop();
+            callback(error || null, event);
+            return;
+          }
+          const senderID = event.senderID == null ? null : String(event.senderID);
+          const isSelf = senderID !== null && senderID === session.userId;
+          if ((event.type === "message" || event.type === "message_reply") && isSelf && !runtimeOptions.selfListen) return;
+          if (event.type === "event" && (isSelf ? !runtimeOptions.selfListenEvent : !runtimeOptions.listenEvents)) return;
+          if (event.type === "typ" && !runtimeOptions.listenTyping) return;
+          if (event.type === "presence" && !runtimeOptions.updatePresence) return;
+          if ((event.type === "message" || event.type === "message_reply") && event.threadID && event.messageID) {
+            if (runtimeOptions.autoMarkDelivery && typeof threadApi.markAsDelivered === "function") {
+              Promise.resolve(threadApi.markAsDelivered(event.threadID, event.messageID)).catch(() => {});
+            }
+            if (runtimeOptions.autoMarkRead && typeof threadApi.markAsRead === "function") {
+              Promise.resolve(threadApi.markAsRead(event.threadID)).catch(() => {});
+            }
+          }
+          if ((event.type === "message" || event.type === "message_reply") && !isSelf && !event.isE2EE) {
+            humanizer.processEvent(event, callback);
+            return;
+          }
+          callback(null, event);
+        });
+        return () => {
+          if (humanizer) humanizer.stop();
+          return detach();
+        };
+      },
+      getHumanizer: () => humanizer,
+      changeGroupImage(image, threadID, callback) {
+        const operation = (async () => {
+          const file = await readImageInput(image);
+          const form = new FormData();
+          form.append("images_only", "true");
+          form.append("attachment[]", new Blob([file.buffer], { type: file.mimeType }), file.fileName);
+          const uploaded = await webClient.postMultipart("https://www.facebook.com/ajax/mercury/upload.php", form);
+          const imageID = uploaded?.payload?.metadata?.[0]?.image_id;
+          if (!imageID) {
+            const error = new Error("Facebook did not return an uploaded group image ID");
+            error.code = "FCA_RESPONSE_SHAPE_INVALID";
+            throw error;
+          }
+          const request = createMessengerChangeGroupImageRequest({ threadID, imageID });
+          const response = await driver.sendRequest(request);
+          return { success: true, response: response?.payload ?? response };
+        })();
+        return callbackResult(operation, callback);
+      },
+      changeAvatar(image, caption, timestamp, callback) {
+        let captionText = "";
+        let expirationTime = null;
+        let done = callback;
+        if (typeof caption === "function") done = caption;
+        else if (typeof caption === "string") captionText = caption;
+        else if (typeof caption === "number") expirationTime = caption;
+        if (typeof timestamp === "function") done = timestamp;
+        else if (timestamp !== undefined && timestamp !== null) {
+          const parsed = Number(timestamp);
+          if (!Number.isFinite(parsed) || parsed < 0) throw new TypeError("timestamp must be a non-negative number");
+          expirationTime = parsed;
+        }
+        if (captionText.length > 2000) throw new RangeError("avatar caption exceeds 2000 characters");
+        const operation = (async () => {
+          const file = await readImageInput(image);
+          const form = new FormData();
+          form.append("profile_id", session.userId);
+          form.append("photo_source", "57");
+          form.append("av", session.userId);
+          form.append("file", new Blob([file.buffer], { type: file.mimeType }), file.fileName);
+          const uploaded = await webClient.postMultipart("https://www.facebook.com/profile/picture/upload/", form);
+          const photoID = uploaded?.payload?.fbid;
+          if (!photoID) {
+            const error = new Error("Facebook did not return an uploaded profile photo ID");
+            error.code = "FCA_RESPONSE_SHAPE_INVALID";
+            throw error;
+          }
+          const variables = {
+            input: {
+              caption: captionText,
+              existing_photo_id: String(photoID),
+              expiration_time: expirationTime,
+              profile_id: session.userId,
+              profile_pic_method: "EXISTING",
+              profile_pic_source: "TIMELINE",
+              scaled_crop_rect: { height: 1, width: 1, x: 0, y: 0 },
+              skip_cropping: true,
+              actor_id: session.userId,
+              client_mutation_id: String(Math.floor(Math.random() * 20))
+            },
+            isPage: false,
+            isProfile: true,
+            scale: 3
+          };
+          const updated = await webClient.post("https://www.facebook.com/api/graphql/", {
+            av: session.userId,
+            fb_api_req_friendly_name: "ProfileCometProfilePictureSetMutation",
+            fb_api_caller_class: "RelayModern",
+            doc_id: "5066134240065849",
+            variables: JSON.stringify(variables)
+          });
+          if (updated?.payload?.errors?.length) {
+            const error = new Error("Facebook rejected the profile picture update");
+            error.code = "FCA_FACEBOOK_REQUEST_REJECTED";
+            throw error;
+          }
+          const result = updated?.payload?.data?.profile_picture_set;
+          if (!result) {
+            const error = new Error("Facebook returned an invalid profile picture update response");
+            error.code = "FCA_RESPONSE_SHAPE_INVALID";
+            throw error;
+          }
+          return result;
+        })();
+        return callbackResult(operation, done);
+      },
+      editMessage(text, messageID, callback) {
+        const request = createMessengerEditMessageRequest({ text, messageID });
+        const operation = driver.sendRequest(request).then(response => {
+          const result = extractEditMessageResult(response);
+          if (result.body !== text) {
+            const error = new Error("The message is too old or not from the authenticated account");
+            error.code = "FCA_MESSAGE_EDIT_REJECTED";
+            error.result = result;
+            throw error;
+          }
+          return result;
+        });
+        return callbackResult(operation, callback);
+      },
+      shareContact(text, senderID, threadID, callbackOrMessageID, callback) {
+        const done = typeof callbackOrMessageID === "function" ? callbackOrMessageID : callback;
+        const request = createMessengerShareContactRequest({ text, senderID, threadID });
+        const operation = driver.sendAction({ topic: "/ls_req", payload: request }).then(() => ({ success: true }));
+        return callbackResult(operation, done);
+      },
       getCurrentUserID: () => session.userId,
+      getAppState: () => session.getAppState(),
+      // Sensitive legacy FCA compatibility helper. Never log or expose this value to ordinary users.
+      getCookies: () => session.getCookieHeader("https://www.facebook.com/"),
+      refreshFb_dtsg: () => session.refreshTokens(),
+      setOptions: options => {
+        if (!options || typeof options !== "object" || Array.isArray(options)) {
+          throw new TypeError("setOptions requires an options object");
+        }
+        const supported = ["logLevel", "selfListen", "selfListenEvent", "listenEvents", "listenTyping", "updatePresence", "autoMarkDelivery", "autoMarkRead"];
+        const unsupported = Object.keys(options).filter(key => !supported.includes(key));
+        if (unsupported.length) {
+          const error = new TypeError("Unsupported native FCA options: " + unsupported.join(", "));
+          error.code = "FCA_OPTION_UNSUPPORTED";
+          throw error;
+        }
+        if (options.logLevel !== undefined) {
+          if (!["silent", "error", "warn", "info", "debug"].includes(options.logLevel)) {
+            throw new TypeError("logLevel must be silent, error, warn, info, or debug");
+          }
+          runtimeOptions.logLevel = options.logLevel;
+        }
+        for (const key of supported.slice(1)) {
+          if (options[key] !== undefined) {
+            if (typeof options[key] !== "boolean") throw new TypeError(key + " must be a boolean");
+            runtimeOptions[key] = options[key];
+          }
+        }
+        return Object.freeze({ ...runtimeOptions });
+      },
       getSessionState: () => session.state,
+      sessionGuard: (requestedPath, legacyOptions = {}) => {
+        if (!guard) throw new Error("Encrypted SessionGuard is not configured; set FCA_SESSION_FILE and FCA_SESSION_KEY or pass sessionGuard.filePath/key");
+        const paths = guard.getPaths();
+        if (requestedPath && path.resolve(requestedPath) !== paths.filePath) {
+          if (path.basename(path.resolve(requestedPath)).toLowerCase() !== "account.txt") {
+            throw new Error("SessionGuard uses its separately configured encrypted snapshot path");
+          }
+        }
+        // Preserve GoatBot's historical interval option while keeping the
+        // encrypted snapshot in its own file. Debounce is not needed because
+        // the guard snapshots the current cookie jar on each scheduled save.
+        if (legacyOptions && legacyOptions.interval !== undefined) {
+          guard.stop();
+          guard.start(legacyOptions.interval);
+        }
+        return Object.freeze({ ...paths, saveNow: guard.saveNow });
+      },
+      stopSessionGuard,
       disconnect: async () => {
         if (closed) return;
         closed = true;
-        try { await transport.disconnect(); }
-        finally { session.close(); }
+        if (humanizer) humanizer.stop();
+        try {
+          try { await stopSessionGuard(); }
+          finally { await transport.disconnect(); }
+        } finally { session.close(); }
       }
     });
   } catch (error) {
+    if (guard) { try { guard.close(); } catch {} }
     try { if (transport) await transport.disconnect(); } catch {}
-    session.close();
+    if (session) session.close();
     throw error;
   }
 }

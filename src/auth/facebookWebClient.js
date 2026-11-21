@@ -4,6 +4,7 @@ const { normalizeFacebookResponse, createFacebookError } = require("./facebookRe
 
 const ALLOWED_HOST = /(^|\.)facebook\.com$|(^|\.)messenger\.com$/;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_MULTIPART_BODY_BYTES = 12 * 1024 * 1024;
 
 function assertFacebookUrl(input) {
   const url = input instanceof URL ? new URL(input.href) : new URL(input);
@@ -60,9 +61,10 @@ function createFacebookWebClient({ session, fetchImpl, normalizeResponse = norma
     }
     const requestHeaders = new Headers(headers || {});
     requestHeaders.set("accept", "application/json, text/javascript, */*; q=0.01");
+    const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
     let requestBody;
     if (verb === "POST") {
-      if (body instanceof URLSearchParams || typeof body === "string" || body instanceof Uint8Array) {
+      if (isMultipart || body instanceof URLSearchParams || typeof body === "string" || body instanceof Uint8Array) {
         requestBody = body;
       } else {
         requestBody = toFormBody(body, session.getTokens(), session.userId);
@@ -74,13 +76,27 @@ function createFacebookWebClient({ session, fetchImpl, normalizeResponse = norma
       throw new TypeError("GET and HEAD requests cannot include a body");
     }
     if (requestBody !== undefined) {
-      const size = typeof requestBody === "string" ? Buffer.byteLength(requestBody, "utf8")
-        : requestBody instanceof URLSearchParams ? Buffer.byteLength(requestBody.toString(), "utf8")
-        : requestBody instanceof Uint8Array ? requestBody.byteLength : 0;
-      if (size > MAX_BODY_BYTES) {
-        throw createFacebookError("Facebook request body exceeded the 2 MiB safety limit", {
-          code: "FCA_REQUEST_TOO_LARGE", retryable: false
-        });
+      let size = 0;
+      if (isMultipart) {
+        for (const [name, value] of requestBody.entries()) {
+          size += Buffer.byteLength(name, "utf8");
+          size += typeof value === "string" ? Buffer.byteLength(value, "utf8") :
+            (value && typeof value.size === "number" ? value.size : 0);
+        }
+        if (size > MAX_MULTIPART_BODY_BYTES) {
+          throw createFacebookError("Facebook multipart request exceeded the 12 MiB safety limit", {
+            code: "FCA_REQUEST_TOO_LARGE", retryable: false
+          });
+        }
+      } else {
+        size = typeof requestBody === "string" ? Buffer.byteLength(requestBody, "utf8")
+          : requestBody instanceof URLSearchParams ? Buffer.byteLength(requestBody.toString(), "utf8")
+          : requestBody instanceof Uint8Array ? requestBody.byteLength : 0;
+        if (size > MAX_BODY_BYTES) {
+          throw createFacebookError("Facebook request body exceeded the 2 MiB safety limit", {
+            code: "FCA_REQUEST_TOO_LARGE", retryable: false
+          });
+        }
       }
     }
     const response = await session.request(url, {
@@ -119,6 +135,18 @@ function createFacebookWebClient({ session, fetchImpl, normalizeResponse = norma
     return Object.freeze({ status: response.status, headers: response.headers, payload, raw });
   }
 
+  function postMultipart(path, formData, options = {}) {
+    if (typeof FormData === "undefined" || !(formData instanceof FormData)) {
+      throw new TypeError("postMultipart requires a FormData body");
+    }
+    const tokens = session.getTokens();
+    if (session.userId && !formData.has("av")) formData.append("av", String(session.userId));
+    if (tokens.fbDtsg && !formData.has("fb_dtsg")) formData.append("fb_dtsg", String(tokens.fbDtsg));
+    if (tokens.lsd && !formData.has("lsd")) formData.append("lsd", String(tokens.lsd));
+    if (tokens.jazoest && !formData.has("jazoest")) formData.append("jazoest", String(tokens.jazoest));
+    return request(path, { ...options, method: "POST", body: formData });
+  }
+
   return Object.freeze({
     request,
     get(path, options = {}) {
@@ -126,7 +154,8 @@ function createFacebookWebClient({ session, fetchImpl, normalizeResponse = norma
     },
     post(path, body, options = {}) {
       return request(path, { ...options, method: "POST", body });
-    }
+    },
+    postMultipart
   });
 }
 

@@ -6,6 +6,7 @@ const { createDiagnosticRecorder } = require("./src/security/diagnostics");
 const { classifySessionState, describeError } = require("./src/security/sessionState");
 const { encryptSession, decryptSession } = require("./src/security/sessionCrypto");
 const { saveSession, loadSession, deleteSession } = require("./src/security/sessionStore");
+const { createSessionGuard } = require("./src/security/sessionGuard");
 const { ConnectionSupervisor } = require("./src/runtime/connection");
 const { EventDispatcher } = require("./src/events/dispatcher");
 const { CookieJar } = require("./src/network/cookieJar");
@@ -43,7 +44,7 @@ const { parseVersion, compareVersions, verifyUpdateManifest, verifyArtifactDiges
 module.exports = {
   normalizeCookies, validateSessionCookies, parseCookieHeader, parseNetscapeCookies,
   redactSecrets, createDiagnosticRecorder, classifySessionState, describeError, encryptSession, decryptSession,
-  saveSession, loadSession, deleteSession, ConnectionSupervisor, EventDispatcher,
+  saveSession, loadSession, deleteSession, createSessionGuard, ConnectionSupervisor, EventDispatcher,
   CookieJar, createRequestClient, retryAfterMs, isRetryableStatus, createPersonalSession, detectSessionChallenge, extractIdentity, extractFacebookTokens,
   createAuthenticationAttempt, AUTHENTICATION_ATTEMPT_STATES,
   parseAccountText, loadAccountConfig, generateTotp,

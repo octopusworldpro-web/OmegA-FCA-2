@@ -1,6 +1,6 @@
 {
   "name": "@nirzon-islam/omega-fca",
-  "version": "0.1.3",
+  "version": "0.1.6-rc.3",
   "description": "OmegA Bot Facebook integration library, developed and maintained by NirZon",
   "main": "index.js",
   "type": "commonjs",
@@ -12,14 +12,10 @@
     "test:syntax": "node -e \"const fs=require('node:fs');const path=require('node:path');const cp=require('node:child_process');const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(d,e.name)):[path.join(d,e.name)]);for(const f of ['index.js',...walk('src'),...walk('test'),...walk('examples'),...walk('tools')].filter(f=>f.endsWith('.js'))){const r=cp.spawnSync(process.execPath,['--check',f],{stdio:'inherit'});if(r.status!==0)process.exit(r.status||1)}\"",
     "prepublishOnly": "npm test && npm run test:syntax",
     "test:appstate": "node examples/appstate-session-check.js",
+    "test:messenger-mqtt": "node examples/messenger-mqtt-smoke.js",
     "capture:browser": "node tools/browser-capture.js"
   },
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/octopusworldpro-web/OmegA-fca-2.git"
-  },
-  "homepage": "https://github.com/octopusworldpro-web/OmegA-fca-2#readme",
   "keywords": [
     "facebook",
     "messenger",
@@ -45,6 +41,7 @@
     "docs/GOATBOT-COMPATIBILITY-MATRIX.md",
     "docs/GOATBOT-INTEGRATION-AUDIT.md",
     "docs/REFERENCE-AUDIT.md",
+    "docs/ERYXEN-REFERENCE-AUDIT.md",
     "docs/NTKHANG-REFERENCE-STUDY.md",
     "docs/SAFE-DIAGNOSTICS.md",
     "docs/REALTIME-FRAME-EVIDENCE.md",
@@ -64,6 +61,7 @@
     "ws": "^8.18.3"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   }
 }

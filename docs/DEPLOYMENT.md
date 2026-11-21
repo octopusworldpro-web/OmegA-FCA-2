@@ -47,6 +47,38 @@ node node_modules/@omega/fca/examples/appstate-session-check.js
 
 This command validates the AppState session layer only. It does not prove that GoatBot can receive Messenger events through OmegA-FCA.
 
+## Live Messenger MQTT acceptance check
+
+After installing dependencies and placing the owner-authorized AppState in the existing `account.txt` or `appstate.json`, run:
+
+~~~bash
+npm run test:messenger-mqtt
+~~~
+
+This owner-operated command validates AppState, attempts the native MQTT handshake/subscription, and prints only event types (never message contents, cookies, or account IDs). Leave it running and send a message to the account from another device to observe incoming event types; stop with Ctrl+C.
+
+An outgoing test is opt-in and sends a real message. Only run it when you intentionally want to send a message to a thread you control:
+
+~~~bash
+FCA_TEST_THREAD_ID=<your-test-thread-id> FCA_TEST_MESSAGE="OmegA-FCA test" npm run test:messenger-mqtt -- --send
+~~~
+
+The script does not send anything unless `--send`, `FCA_TEST_THREAD_ID`, and `FCA_TEST_MESSAGE` are all explicitly provided. This is a live account test and is not part of CI. A successful client-side publish request alone does not prove the recipient received the message; verify on the recipient device.
+
+## Optional encrypted SessionGuard for existing GoatBot deployments
+
+The native MQTT driver can persist validated AppState snapshots in a separate encrypted file. This is optional; the existing `account.txt` AppState file remains the login source and is never overwritten by SessionGuard.
+
+Configure these optional environment variables in the private deployment environment (Railway/Render), not in tracked Bot config:
+
+~~~bash
+FCA_SESSION_FILE=./private/facebook-session.enc
+FCA_SESSION_KEY=<64-hex-character-owner-generated-key>
+FCA_SESSION_INTERVAL_MS=180000
+~~~
+
+Use a private persistent volume for the encrypted file. Generate and retain the 32-byte key outside the repository; losing it makes snapshots unrecoverable. The legacy GoatBot call `api.sessionGuard(account.txt, { interval, debounce })` is supported as an activation alias. Its `interval` option is honored; `debounce` is accepted for call compatibility but periodic snapshots do not use debounce semantics. Encrypted bytes are stored only in `FCA_SESSION_FILE` (plus a `.bak` backup). The encrypted path and backup path are explicitly rejected if either resolves to the GoatBot project-root `account.txt`. If the optional environment variables are absent, the encrypted guard remains disabled and the existing AppState workflow continues unchanged.
+
 ## Railway / Render notes
 
 For this phase, deploy the **existing GoatBot application** with its currently working FCA dependency unchanged. Keep its `account.txt` as a private runtime file/volume or use the bot's existing secure session mechanism. Do not bake AppState into the image, commit it, print it in logs, or place it in a public build artifact.
