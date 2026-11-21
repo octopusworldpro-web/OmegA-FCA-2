@@ -39,7 +39,7 @@ function createFcaClient(api) {
     ["getThreadPictures", "getPictures"], ["createGroup", "createGroup"],
     ["setTitle"], ["changeThreadColor", "changeColor"],
     ["changeThreadEmoji", "changeEmoji"], ["changeNickname"],
-    ["changeGroupImage", "changeImage"], ["changeAdminStatus"], ["createPoll"]
+    ["changeGroupImage", "changeImage"], ["changeAdminStatus"], ["createPoll"], ["pinMessage", "pin"], ["unpinMessage", "unpin"]
   ]);
   const users = group(api, [
     ["getUserInfo", "getInfo"], ["getUserID", "getId"], ["getUID", "getUid"],
@@ -48,14 +48,14 @@ function createFcaClient(api) {
     ["sendFriendRequest"], ["handleFriendRequest"], ["followUser"],
     ["unfollowUser"], ["unfriend"]
   ]);
-  const account = group(api, [
+  const posts = group(api, [\n    ["setPostReaction", "react"], ["reactToPost"], ["reactToComment"],\n    ["postComment", "comment"], ["sharePost", "share"]\n  ]);\n  const account = group(api, [
     ["getCurrentUserID", "getCurrentUserId"], ["getAppState"],
     ["getCookies"], ["refreshFb_dtsg", "refreshDtsg"],
     ["setOptions"], ["logout"], ["saveSession"], ["restoreSessionBackup"],
     ["stopSessionGuard"], ["addExternalModule"]
   ]);
 
-  return Object.freeze({ messages, threads, users, account });
+  return Object.freeze({ messages, threads, users, posts, account });
 }
 
 module.exports = { createFcaClient };
