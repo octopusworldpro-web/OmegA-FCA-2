@@ -42,7 +42,7 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 | `sendAudio` | Implemented; live-unverified | Client helper and attachment upload path exist. |
 | `sendFile` | Implemented; live-unverified | Client helper and attachment upload path exist. |
 | `shareLink` | Implemented; live-unverified | Client helper uses authenticated share-URL preparation and send flow. |
-| `shareContact` | Implemented; live-unverified | Native driver action exists; response delivery remains live-unverified. |
+| `shareContact` | Implemented; live-unverified | Native driver uses correlated `/ls_req`–`/ls_resp` response handling; live broker acceptance remains unverified. |
 | `editMessage` | Implemented; live-unverified | Native driver and authenticated request path exist. |
 | `unsendMessage` | Implemented; live-unverified | Authenticated unsend endpoint exists. |
 | `deleteMessage` | Implemented; semantics differ from unsend | Explicit delete-for-me operation; not a substitute for unsend. |
@@ -157,3 +157,11 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 - [ ] Authorized live Facebook acceptance — separate release gate, not a synthetic audit claim.
 
 **Result:** Step 2 (reference/API parity audit) is complete. The library itself is not yet full-parity or release-complete. Use this matrix as the authoritative checklist for subsequent implementation steps.
+
+
+## Step 5 implementation checkpoint (2026-11-21)
+
+- Reply metadata is carried in the correlated MQTT send request; explicit Messenger send rejection payloads are surfaced as errors.
+- `editMessage`, `unsendMessage`, `markAsRead`, `markAsReadAll`, `markAsSeen`, and `markAsDelivered` have implementation and synthetic contract coverage. Read-receipt event normalization preserves metadata watermark timestamps.
+- Concurrent MQTT request failures are isolated, request capacity is checked before publishing, and request-ID wraparound avoids IDs still pending.
+- All listed Facebook-specific wire behavior remains live-unverified; this checkpoint does not claim full FCA parity or production acceptance.
