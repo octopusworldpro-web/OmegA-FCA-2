@@ -202,6 +202,28 @@ test("SessionGuard refuses to use the GoatBot account.txt path for encrypted out
   }), /separate from GoatBot account.txt/);
 });
 
+test("SessionGuard protects account, AppState, and config files as both primary and backup paths", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omega-driver-protected-session-paths-"));
+  const safeFile = path.join(directory, "session.enc");
+  const protectedNames = ["account.txt", "appstate.json", "config.json"];
+  try {
+    for (const name of protectedNames) {
+      const protectedPath = path.resolve(process.cwd(), name);
+      await assert.rejects(createFacebookMqttDriver({
+        appState, socketFactory: () => new FakeWebSocket(),
+        sessionGuard: { filePath: protectedPath, key: "f".repeat(64) }
+      }), /separate from account\.txt, appstate\.json, and config\.json/);
+      await assert.rejects(createFacebookMqttDriver({
+        appState, socketFactory: () => new FakeWebSocket(),
+        sessionGuard: { filePath: safeFile, backupPath: protectedPath, key: "f".repeat(64) }
+      }), /separate from account\.txt, appstate\.json, and config\.json/);
+    }
+    assert.equal(fs.existsSync(safeFile), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("SessionGuard rejects malformed encryption keys before network setup", async () => {
   await assert.rejects(createFacebookMqttDriver({
     appState,
