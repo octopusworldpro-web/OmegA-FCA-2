@@ -183,6 +183,8 @@ async function createFacebookMqttDriver({
       if (!items.length || items.length > MAX_ATTACHMENT_COUNT) throw new RangeError("Attachment count must be between 1 and 10");
       const files = [];
       for (const item of items) files.push(await readAttachmentInput(item));
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      if (totalBytes > 10 * 1024 * 1024) throw new RangeError("Combined attachment upload exceeds the 10 MiB safety limit");
       const form = new FormData();
       form.append("voice_clip", "false");
       files.forEach((file, index) => form.append("upload_" + index, new Blob([file.buffer], { type: file.mimeType }), file.fileName));
@@ -230,6 +232,7 @@ async function createFacebookMqttDriver({
       const hasUrl = message.url != null;
       if (hasFiles && hasUrl) throw new TypeError("A message can contain attachments or a share URL, not both");
       if (!hasFiles && !hasUrl) throw new TypeError("Attachment message requires attachment or url");
+      const offlineId = offlineThreadingId();
       const form = {
         client: "mercury", action_type: "ma-type:user-generated-message",
         author: "fbid:" + session.userId,
@@ -241,7 +244,7 @@ async function createFacebookMqttDriver({
         is_filtered_content_invalid_app: false, is_spoof_warning: false,
         source: "source:chat:web", "source_tags[0]": "source:chat",
         body, html_body: false, ui_push_phase: "V3", status: "0",
-        offline_threading_id: offlineThreadingId(), message_id: offlineThreadingId(),
+        offline_threading_id: offlineId, message_id: offlineId,
         threading_id: offlineThreadingId(), "ephemeral_ttl_mode:": "0",
         manual_retry_cnt: "0", has_attachment: true
       };
