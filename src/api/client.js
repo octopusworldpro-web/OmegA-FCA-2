@@ -14,7 +14,7 @@ const METHOD_FEATURES = Object.freeze({
   getThreadHistory: "threads", getMessage: "threads", getFriendsList: "threads", getThreadPictures: "threads", searchForThread: "threads", handleMessageRequest: "threads", changeAdminStatus: "groups", createPoll: "groups",
   getUserID: "threads", getUID: "threads", resolvePhotoUrl: "threads",
   createNewGroup: "groups", addUserToGroup: "groups", removeUserFromGroup: "groups",
-  changeNickname: "groups", changeGroupImage: "groups", changeAvatar: "groups",
+  changeNickname: "groups", changeAdminStatus: "groups", createPoll: "groups", changeGroupImage: "groups", changeAvatar: "groups", changeBlockedStatus: "users", changeBio: "users", unfriend: "users",
   changeThreadColor: "groups", changeThreadEmoji: "groups", setTitle: "groups",
   setMessageReaction: "reactions"
 });
@@ -22,7 +22,7 @@ const METHOD_FEATURES = Object.freeze({
 const DRIVER_METHODS = [
   "sendRequest", "sendMessage", "editMessage", "shareContact", "uploadAttachment", "downloadAttachment", "forwardAttachment", "httpGet", "httpPost", "getUserInfo", "getThreadInfo", "getThreadList", "getCurrentUserID", "getAppState", "getCookies", "getHumanizer", "refreshFb_dtsg", "setOptions",
   "markAsRead", "markAsReadAll", "markAsSeen", "markAsDelivered", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator", "unsendMessage",
-  "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
+  "changeNickname", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "changeBlockedStatus", "changeBio", "unfriend", "getEmojiUrl", "changeGroupImage", "changeAvatar", "changeThreadColor", "changeThreadEmoji", "setTitle", "addUserToGroup", "removeUserFromGroup", "createNewGroup",
   "getThreadHistory", "getMessage", "getFriendsList", "getUserID", "getUID", "resolvePhotoUrl"
 ];
 
