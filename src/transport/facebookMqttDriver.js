@@ -8,7 +8,7 @@ const { createNativeRealtimeTransport } = require("./nativeRealtimeTransport");
 const { createFacebookThreadApi } = require("./facebookThreadApi");
 const { createFacebookWebClient } = require("../auth/facebookWebClient");
 const { readImageInput, readAttachmentInput, downloadAttachment: downloadAttachmentFile, MAX_ATTACHMENT_COUNT } = require("../compat/imageUpload");
-const { createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
+const { offlineThreadingId, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest } = require("./messengerActions");
 const { createHumanizer } = require("../compat/humanizer");
 
 /**
