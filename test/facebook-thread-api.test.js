@@ -593,6 +593,6 @@ test("friend request, follow/unfollow and postComment use validated Comet mutati
   assert.equal(calls[3].body.doc_id, "6993516810709754");
   const commentVariables = JSON.parse(calls[3].body.variables);
   assert.equal(commentVariables.input.feedback_id, Buffer.from("feedback:post.1").toString("base64"));
-  await assert.rejects(api.postComment("", "post.1"), /non-empty string/);
+  assert.throws(() => api.postComment("", "post.1"), /non-empty string/);
   assert.throws(() => api.followUser("bad"), /numeric Facebook ID/);
 });
