@@ -497,3 +497,37 @@ test("native driver exposes callback-compatible saveSession and bounded multipar
   }
 });
 
+
+
+test("sendMessage reports explicit Messenger rejection instead of returning it as success", async () => {
+  const socket = new FakeWebSocket();
+  const driver = await createFacebookMqttDriver({
+    appState, fetchImpl: async () => htmlResponse(), socketFactory: () => socket,
+    mqtt: { keepAlive: 0 }
+  });
+  const originalSend = socket.send.bind(socket);
+  let rejectNext = true;
+  socket.send = frame => {
+    originalSend(frame);
+    const packet = mqtt.decodePacket(Buffer.from(frame));
+    if (packet.type !== "publish" || packet.topic !== "/ls_req") return;
+    const request = JSON.parse(packet.payload.toString("utf8"));
+    const response = rejectNext
+      ? { request_id: request.request_id, payload: { error: 1545012 } }
+      : { request_id: request.request_id, payload: { accepted: true } };
+    rejectNext = false;
+    setImmediate(() => socket.emit("message", mqtt.encodePublish({
+      topic: "/ls_resp", payload: JSON.stringify(response), qos: 1, packetId: 92
+    })));
+  };
+  try {
+    await assert.rejects(
+      driver.sendMessage({ threadID: "987654321", message: "not sent" }),
+      error => error.code === "FCA_FACEBOOK_REQUEST_REJECTED" && error.retryable === false
+    );
+    const accepted = await driver.sendMessage({ threadID: "987654321", message: "sent" });
+    assert.deepEqual(accepted.payload, { accepted: true });
+  } finally {
+    await driver.disconnect();
+  }
+});
