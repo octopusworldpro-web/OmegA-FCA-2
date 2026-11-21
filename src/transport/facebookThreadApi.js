@@ -711,6 +711,46 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
+  function sharePost(postID, message, callback) {
+    if (typeof message === "function") { callback = message; message = undefined; }
+    const post = String(postID ?? "").trim();
+    if (!post || post.length > 256) throw new TypeError("postID is invalid");
+    if (message !== undefined && (typeof message !== "string" || Buffer.byteLength(message, "utf8") > 20000)) {
+      throw new TypeError("message must be a string up to 20000 bytes");
+    }
+    const storyID = Buffer.from("S:_I" + currentUserID + ":" + post).toString("base64");
+    const variables = {
+      input: {
+        source: "OBJECT",
+        story_id: storyID,
+        message: message ? { text: message } : null,
+        client_mutation_id: "1"
+      }
+    };
+    const operation = web.post(GRAPHQL_URL, {
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: "CometFeedToFeedReshareMutation",
+      variables: JSON.stringify(variables),
+      server_timestamps: true,
+      doc_id: "4833173726776940"
+    }).then(result => {
+      const payload = object(result?.payload);
+      if (payload.errors?.length || payload.error) {
+        throw createFacebookError("sharePost: Facebook rejected the share", {
+          code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false
+        });
+      }
+      const story = payload.data?.story_share?.story;
+      if (!story?.id) {
+        throw createFacebookError("sharePost: response is missing shared story data", {
+          code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false
+        });
+      }
+      return { success: true, postID: post, shareID: String(story.id), url: story.url ?? null };
+    });
+    return callbackResult(operation, callback);
+  }
+
   function setTitle(newTitle, threadID, callback) {
     if (typeof newTitle !== "string" || newTitle.length > 100) throw new TypeError("newTitle must be a string up to 100 characters");
     const thread = id(threadID, "threadID");
@@ -1158,7 +1198,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
     return callbackResult(operation, callback);
   }
 
-  return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo, sendFriendRequest, followUser, unfollowUser, postComment,
+  return Object.freeze({ httpGet, httpPost, getThreadList, getThreadInfo, getThreadHistory, getMessage, getUserID, getUID, resolvePhotoUrl, getFriendsList, createNewGroup, getUserInfo, sendFriendRequest, followUser, unfollowUser, postComment, sharePost,
     addUserToGroup, removeUserFromGroup, changeNickname, changeAdminStatus, createPoll, handleMessageRequest, searchForThread, getThreadPictures, changeBlockedStatus, changeBio, unfriend, getEmojiUrl, changeThreadColor, changeThreadEmoji, setTitle, setMessageReaction, setPostReaction, reactToPost, reactToComment, handleFriendRequest, markAsRead, markAsReadAll, markAsSeen, markAsDelivered, deleteMessage, deleteThread, muteThread, changeArchivedStatus, unsendMessage, sendTypingIndicator });
 }
 
