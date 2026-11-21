@@ -68,8 +68,8 @@ async function readBytes(input, maxBytes) {
 }
 
 function safeFileName(input, extension) {
-  const raw = typeof input === "string" ? path.basename(input) : (typeof input?.path === "string" ? path.basename(input.path) :
-    (typeof input?.name === "string" ? path.basename(input.name) : ""));
+  const source = typeof input === "string" ? input : (typeof input?.path === "string" ? input.path : (typeof input?.name === "string" ? input.name : ""));
+  const raw = source ? path.basename(source.replace(/\\/g, "/")) : "";
   const clean = raw && !/[\r\n\0]/.test(raw) ? raw : "";
   if (!clean) return "upload" + extension;
   return clean.slice(0, 180);
@@ -147,7 +147,7 @@ function filenameFromDisposition(value) {
   const plain = /filename="?([^";]+)"?/i.exec(value);
   const raw = utf ? decodeURIComponent(utf[1]) : plain?.[1];
   if (!raw) return null;
-  const name = path.basename(raw).replace(/[\r\n\0]/g, "").slice(0, 180);
+  const name = path.basename(raw.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180);
   return name || null;
 }
 
@@ -167,6 +167,7 @@ async function downloadAttachment(input, options = {}) {
       response = await fetchImpl(url, { method: "GET", redirect: "manual", signal: controller.signal, headers: { accept: "*/*" } });
       if (response.status < 300 || response.status >= 400) break;
       if (redirects >= 4) throw new Error("Attachment download exceeded the redirect limit");
+      try { await response.body?.cancel?.(); } catch {}
       const location = response.headers?.get?.("location");
       if (!location) throw new Error("Attachment download returned an invalid redirect");
       url = safeDownloadUrl(new URL(location, url).toString());
@@ -187,7 +188,7 @@ async function downloadAttachment(input, options = {}) {
       url: url.toString()
     });
   } catch (error) {
-    if (controller.signal.aborted && error?.name === "AbortError") {
+    if (controller.signal.aborted) {
       const timeout = new Error("Attachment download timed out");
       timeout.code = "FCA_ATTACHMENT_DOWNLOAD_TIMEOUT";
       throw timeout;
