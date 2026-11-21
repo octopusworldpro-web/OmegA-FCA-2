@@ -311,7 +311,8 @@ test("implements editMessage and shareContact with correlated MQTT requests", as
     if (task.queue_name === "edit_message") {
       assert.equal(taskPayload.message_id, "mid-edit");
       assert.equal(taskPayload.text, "edited text");
-      const candidate = [null, null, "mid-edit", null, "edited text"];
+      const candidate = [null, null, taskPayload.message_id, null,
+        taskPayload.message_id === "mid-old" ? "original text" : "edited text"];
       response = {
         request_id: request.request_id,
         payload: { step: [null, [null, null, [null, null, [null, candidate]]]] }
@@ -333,6 +334,8 @@ test("implements editMessage and shareContact with correlated MQTT requests", as
   try {
     const edited = await driver.editMessage("edited text", "mid-edit");
     assert.deepEqual(edited, { body: "edited text", messageID: "mid-edit" });
+    await assert.rejects(driver.editMessage("edited text", "mid-old"), error =>
+      error.code === "FCA_MESSAGE_EDIT_REJECTED");
     const shared = await driver.shareContact("contact", "111111111111111", "222222222222222", "legacy-message-id");
     assert.equal(shared.success, true);
   } finally {
