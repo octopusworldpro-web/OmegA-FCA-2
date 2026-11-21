@@ -198,3 +198,8 @@ These additions are source-level implementations and deterministic tests; Facebo
 - `getProfileInfo(userID, callback?)` and `getPublicData(userID, callback?)` now expose the normalized native `getUserInfo` result.
 - `getAvatarUser(userID, callback?)` returns the normalized profile thumbnail URL (or `null` when unavailable).
 - These are compatibility adapters over the authenticated user-info response; they do not claim extra profile fields beyond those returned by Facebook.
+
+
+## Current method-level audit supersedes the earlier summary table
+
+The earlier area-level inventory above is historical context and contains stale status descriptions. For the current public `@eryxenx/fca@1.3.5` API surface, method-by-method implementation status, definite missing methods, option parity and E2EE gaps, use [ERYXEN-API-PARITY-MATRIX.md](ERYXEN-API-PARITY-MATRIX.md). That matrix was checked against the current npm README and the current OmegA-FCA source tree on 2026-11-21. Do not use the old area-level table alone to decide implementation completeness.
