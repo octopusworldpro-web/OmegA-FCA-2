@@ -110,11 +110,11 @@ GoatBot commands access \`event.messageReply\`, including:
 - \`scripts/cmds/groupimage.js\` — \`event.messageReply.attachments\`
 - \`scripts/cmds/uid.js\` and \`pp.js\` — \`event.messageReply.senderID\`
 
-The current native event normalizer can label a message as \`message_reply\`, but it does not construct the legacy nested \`messageReply\` object. It also copies raw delta attachments rather than guaranteeing the legacy \`type\` and \`url\` fields. Reply-based commands therefore do not yet have full event-shape compatibility.
+Resolved in FCA-2 main: the normalizer now constructs \`messageReply\` with stable \`messageID\`, \`senderID\`, \`body\`, \`attachments\`, \`timestamp\`, and \`threadID\` fields, and maps common attachment metadata into legacy \`type\`/\`url\`/\`ID\` fields. When quoted content is absent, unavailable values remain empty/null rather than fabricated. See [GOATBOT-EVENT-COMPATIBILITY.md](GOATBOT-EVENT-COMPATIBILITY.md).
 
 ### E. Read-receipt event name mismatch
 
-FCA-2's current Messenger delta normalizer emits \`type: "read"\` for \`ReadReceipt\` / \`MarkRead\`. GoatBot's \`bot/handler/handlerAction.js\` dispatches \`read_receipt\`. The read-receipt handler will not run for the currently emitted \`read\` event.
+Resolved in FCA-2 main: \`ReadReceipt\`, \`MarkRead\`, and \`ReadReceiptEvent\` now normalize to \`type: "read_receipt"\`, with \`reader\`/\`userID\`, \`threadID\`, and \`watermarkTimestamp\` aliases where present. Live Facebook payload acceptance remains unverified.
 
 ### F. E2EE is not wired
 
@@ -150,13 +150,13 @@ FCA-2 currently normalizes these observed delta classes:
 
 | Facebook delta class | FCA-2 event type | GoatBot compatibility |
 |---|---|---|
-| \`NewMessage\`, \`Message\` | \`message\` or \`message_reply\` | Partial: core IDs/body exist, but nested \`messageReply\` and legacy attachment normalization are missing. |
+| \`NewMessage\`, \`Message\` | \`message\` or \`message_reply\` | Legacy sender aliases, nested \`messageReply\`, and common attachment \`type\`/\`url\`/\`ID\` normalization are implemented; unknown raw shapes/live payloads remain unverified. |
 | \`MessageReaction\`, \`Reaction\` | \`message_reaction\` | Core event name and reaction/user ID fields align. |
 | \`MessageUnsend\`, \`UnsendMessage\` | \`message_unsend\` | Event name aligns. |
 | \`Typing\`, \`TypingNotification\` | \`typ\` | Event name aligns. |
-| \`ReadReceipt\`, \`MarkRead\` | \`read\` | Mismatch: GoatBot expects \`read_receipt\`. |
+| \`ReadReceipt\`, \`MarkRead\`, \`ReadReceiptEvent\` | \`read_receipt\` | Event name now matches; reader/thread/watermark aliases are normalized when present. |
 | \`Presence\`, \`PresenceUpdate\` | \`presence\` | Event name aligns; live payload shape remains unverified. |
-| \`ThreadEvent\`, \`ThreadName\`, \`ParticipantAdded\`, \`ParticipantRemoved\` | \`event\` | Partial: normalized as \`logMessageType\` / \`logMessageData\`; all legacy subtypes are not mapped. |
+| Known thread/participant/admin/color/icon/call/poll classes | \`event\` | Common legacy \`logMessageType\` values and author/participant aliases are mapped; unsupported classes remain conservative. |
 | Other classes | \`unknown_delta\` | Not dispatched as a legacy event. |
 
 No live Facebook capture was used to assert that the above unofficial delta class names are current or exhaustive.
