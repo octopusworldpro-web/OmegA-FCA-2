@@ -150,6 +150,43 @@ function createMessengerShareContactRequest(input = {}) {
 }
 
 
+const PIN_MESSAGE_VERSION_ID = "25095469420099952";
+
+/**
+ * Builds the observed Messenger Lightspeed pin/unpin task.
+ * The task shape is community-observed and requires live account acceptance.
+ */
+function createMessengerPinMessageRequest(input = {}) {
+  const threadID = String(input.threadID ?? "");
+  const messageID = String(input.messageID ?? "");
+  const pin = input.pin !== false;
+  if (!/^\\d{5,30}$/.test(threadID)) throw new TypeError("threadID must be a numeric Facebook ID");
+  if (!messageID || messageID.length > 256) throw new TypeError("messageID is invalid");
+  const timestamp = input.timestamp ?? Date.now();
+  if (!Number.isSafeInteger(timestamp) || timestamp < 1) throw new TypeError("timestamp is invalid");
+  const taskId = input.taskId ?? randomInt(1, 65536);
+  if (!Number.isInteger(taskId) || taskId < 1 || taskId > 65535) throw new TypeError("taskId is invalid");
+  const epochId = input.epochId ?? offlineThreadingId(timestamp);
+  if (!/^\\d{10,24}$/.test(String(epochId))) throw new TypeError("epochId is invalid");
+  return Object.freeze({
+    app_id: MESSENGER_MQTT_APP_ID,
+    payload: JSON.stringify({
+      data_trace_id: null,
+      epoch_id: String(epochId),
+      tasks: [{
+        failure_count: null,
+        label: pin ? "430" : "431",
+        payload: JSON.stringify({ thread_key: threadID, message_id: messageID, timestamp_ms: timestamp }),
+        queue_name: (pin ? "pin_msg_v2_" : "unpin_msg_v2_") + threadID,
+        task_id: taskId
+      }],
+      version_id: PIN_MESSAGE_VERSION_ID
+    }),
+    request_id: input.requestId ?? randomInt(1, 1000000),
+    type: 3
+  });
+}
+
 const CHANGE_GROUP_IMAGE_VERSION_ID = "8798795233522156";
 
 function createMessengerChangeGroupImageRequest(input = {}) {
@@ -178,4 +215,4 @@ function createMessengerChangeGroupImageRequest(input = {}) {
   });
 }
 
-module.exports = { MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest };
+module.exports = { MESSENGER_MQTT_APP_ID, SEND_MESSAGE_VERSION_ID, offlineThreadingId, createMessengerSendMessageRequest, createMessengerEditMessageRequest, createMessengerShareContactRequest, createMessengerChangeGroupImageRequest, createMessengerPinMessageRequest };
