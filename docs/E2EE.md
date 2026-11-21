@@ -25,22 +25,16 @@ This port covers the one-to-one text/media path only.
 ## Usage
 
 \`\`\`js
-const { createClient } = require("@nirzon-islam/omega-fca");
+const { createFacebookMqttClient } = require("@nirzon-islam/omega-fca");
 
-const client = createClient({
-  authenticate: context => createFacebookMqttDriver({
-    appState: context.credentials,
-    socketFactory,
-    options: context.options
-  })
-});
-
-const api = await client.login(credentials, {
+const client = createFacebookMqttClient({
   // Recommended: set FCA_E2EE_KEY to 64 random hex characters (32 bytes).
   e2eeStorageKey: process.env.FCA_E2EE_KEY,
   // Optional; defaults to ~/.omega-fca/e2ee/<Facebook user ID>.json
   e2eeDevicePath: process.env.FCA_E2EE_DEVICE_PATH
 });
+
+const api = await client.login(credentials);
 
 // Establish/register the E2EE device and start its Noise connection.
 await api.connectE2EE();
