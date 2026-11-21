@@ -83,15 +83,15 @@ The E2EE namespace also has a substantial behavior gap: OmegA exposes connect/di
 | `getAvatarUser` | Implemented; adapter | Derived from normalized `getUserInfo` thumbnail. |
 | `getProfileInfo` | Implemented; adapter | Derived from normalized `getUserInfo`; no additional fields are promised. |
 | `getPublicData` | Implemented; adapter | Derived from normalized `getUserInfo`; no additional fields are promised. |
-| `sendFriendRequest` | **Missing** | No matching first-party action found. `handleFriendRequest` is not equivalent. |
+| `sendFriendRequest` | Implemented; live-unverified | Authenticated Comet friend-request mutation; returns friendship status. |
 | `handleFriendRequest` | Implemented; live-unverified | Authenticated accept/reject action exists. |
 | `changeBlockedStatus` | Implemented; live-unverified | Authenticated block/unblock action exists. |
-| `followUser` | **Missing** | No matching first-party action found. |
-| `unfollowUser` | **Missing** | No matching first-party action found. |
+| `followUser` | Implemented; live-unverified | Authenticated Comet follow mutation. |
+| `unfollowUser` | Implemented; live-unverified | Authenticated Comet unfollow mutation. |
 | `unfriend` | Implemented; live-unverified | Authenticated friend-removal action exists. |
 | `reactToPost` | Implemented; live-unverified | Adapter over post-reaction action exists. |
 | `reactToComment` | Implemented; live-unverified | Adapter over post-reaction action exists; comment reaction semantics need live confirmation. |
-| `postComment` | **Missing** | No matching first-party action found. |
+| `postComment` | Implemented; live-unverified | Authenticated Comet comment mutation for text comments and optional comment replies; rich attachment/mention parity is not claimed. |
 | `sharePost` | **Missing** | No matching first-party action found. |
 | `getCurrentUserID` | Implemented | Native authenticated session identity exists. |
 | `getAppState` | Implemented | Native session cookie/AppState export exists. |
