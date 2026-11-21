@@ -444,7 +444,18 @@ test("native driver exposes callback-compatible saveSession and bounded multipar
   let driver;
   try {
     driver = await createFacebookMqttDriver({
-      appState, fetchImpl: async () => htmlResponse(),
+      appState,
+      fetchImpl: async url => {
+        if (String(url).includes("/ajax/mercury/upload.php")) {
+          const raw = JSON.stringify({ payload: { success: true } });
+          return {
+            status: 200, ok: true,
+            headers: { get: name => name.toLowerCase() === "content-type" ? "application/json" : name.toLowerCase() === "content-length" ? String(Buffer.byteLength(raw)) : null },
+            text: async () => raw
+          };
+        }
+        return htmlResponse();
+      },
       socketFactory: () => new FakeWebSocket(), mqtt: { keepAlive: 0 },
       sessionGuard: { filePath, key: "1".repeat(64), intervalMs: 60_000 }
     });

@@ -332,7 +332,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
     facade.sessionGuard = typeof driver.sessionGuard === "function" ? driver.sessionGuard.bind(driver) : undefined;
     facade.setOptions = typeof driver.setOptions === "function" ? driver.setOptions.bind(driver) : undefined;
     facade.getCapabilities = () => Object.freeze({
-      methods: Object.freeze([...DRIVER_METHODS.filter(method => typeof driver[method] === "function"), "addExternalModule"]),
+      methods: Object.freeze(DRIVER_METHODS.filter(method => typeof driver[method] === "function")),
       events: typeof driver.listen === "function",
       sessionGuard: typeof driver.sessionGuard === "function",
       e2ee: typeof driver.connectE2EE === "function" && typeof driver.sendE2EEMessage === "function"
@@ -363,7 +363,7 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
         if (!/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/.test(name) ||
             ["__proto__", "prototype", "constructor", "addExternalModule"].includes(name) ||
             Object.prototype.hasOwnProperty.call(facade, name) ||
-            externalMethods.has(name) || typeof method !== "function") {
+            DRIVER_METHODS.includes(name) || externalMethods.has(name) || typeof method !== "function") {
           throw new TypeError("External FCA module contains an invalid, duplicate, or reserved method: " + name);
         }
         externalMethods.set(name, method.bind(facade));
