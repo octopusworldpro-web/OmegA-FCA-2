@@ -269,3 +269,28 @@ test("client facade forwards native httpGet Promise and callback signatures", as
   assert.deepEqual(calls[1], { url: "https://www.facebook.com/", query: undefined });
   await client.logout();
 });
+
+test("legacy sendMessage accepts a reply ID in the third argument when callback is omitted", async () => {
+  let captured;
+  const client = createClient({
+    requireLicense: false,
+    authenticate: async () => ({
+      getCurrentUserID: () => "123456",
+      sendMessage: async input => { captured = input; return { messageID: "m2" }; },
+      listen: () => () => {},
+      disconnect: async () => {}
+    })
+  });
+  const api = await client.login({ mode: "appstate", appState: [
+    { key: "c_user", value: "123456", domain: "facebook.com" },
+    { key: "xs", value: "synthetic-session-value", domain: "facebook.com" }
+  ] });
+  await api.sendMessage("reply body", "987654321", "mid.reply-target");
+  assert.deepEqual(captured, {
+    threadID: "987654321",
+    message: "reply body",
+    replyToMessageID: "mid.reply-target"
+  });
+  await client.logout();
+});
+
