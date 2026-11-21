@@ -526,3 +526,39 @@ test("post/comment reactions and friend-request decisions use validated FCA requ
   assert.throws(() => api.handleFriendRequest("987654321", "yes"), /accept must be a boolean/);
 });
 
+
+
+test("markAsReadAll and markAsSeen send validated receipt requests", async () => {
+  const calls = [];
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async (url, body) => {
+      calls.push({ url, body });
+      return { payload: { success: true } };
+    } }
+  });
+  assert.deepEqual(await api.markAsReadAll(), { success: true });
+  assert.deepEqual(await api.markAsSeen(1700000000123), { success: true });
+  assert.deepEqual(calls, [
+    { url: "https://www.facebook.com/ajax/mercury/mark_folder_as_read.php", body: { folder: "inbox" } },
+    { url: "https://www.facebook.com/ajax/mercury/mark_seen.php", body: { seen_timestamp: 1700000000123 } }
+  ]);
+  assert.throws(() => api.markAsSeen(-1), /non-negative integer/);
+  assert.throws(() => api.markAsSeen("not-a-timestamp"), /non-negative integer/);
+});
+
+test("read-all, seen and unsend receipt failures reach legacy callbacks", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ payload: { error: 1 } }) }
+  });
+  for (const invoke of [
+    callback => api.markAsReadAll(callback),
+    callback => api.markAsSeen(1700000000123, callback),
+    callback => api.unsendMessage("mid.callback", callback)
+  ]) {
+    const error = await new Promise(resolve => invoke(resolve));
+    assert.equal(error?.code, "FCA_FACEBOOK_REQUEST_REJECTED");
+    assert.equal(error?.retryable, false);
+  }
+});
