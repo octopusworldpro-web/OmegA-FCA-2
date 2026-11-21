@@ -413,3 +413,26 @@ test("httpGet supports callbacks and rejects invalid query values", async () => 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(value, "ok");
 });
+
+
+test("setMessageReaction and markAsRead reject Facebook-declared action failures", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ payload: { error: 1545012 } }) }
+  });
+  await assert.rejects(api.setMessageReaction("👍", "mid.failure"), error =>
+    error.code === "FCA_FACEBOOK_REQUEST_REJECTED" && error.retryable === false);
+  await assert.rejects(api.markAsRead("123456789012345"), error =>
+    error.code === "FCA_FACEBOOK_REQUEST_REJECTED" && error.retryable === false);
+});
+
+test("markAsRead forwards Facebook failures through its legacy callback", async () => {
+  const api = createFacebookThreadApi({
+    session,
+    webClient: { post: async () => ({ payload: { error: 1 } }) }
+  });
+  let callbackError;
+  api.markAsRead("123456789012345", error => { callbackError = error; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(callbackError?.code, "FCA_FACEBOOK_REQUEST_REJECTED");
+});
