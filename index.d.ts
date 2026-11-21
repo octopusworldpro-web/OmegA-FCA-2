@@ -382,7 +382,9 @@ export interface UploadedAttachment {
 export interface DownloadedAttachment {
   buffer: Buffer; size: number; mimeType: string; fileName: string | null; url: string;
 }
-export const MAX_IMAGE_UPLOAD_BYTES: number;\nexport function readImageInput(input: AttachmentInput, options?: { maxBytes?: number }): Promise<Readonly<{ buffer: Buffer; mimeType: string; fileName: string; size: number }>>;\nexport function readAttachmentInput(input: AttachmentInput, options?: { maxBytes?: number }): Promise<Readonly<{ buffer: Buffer; mimeType: string; fileName: string; size: number; kind: "image" | "video" | "audio" | "file" }>>;
+export const MAX_IMAGE_UPLOAD_BYTES: number;
+export function readImageInput(input: AttachmentInput, options?: { maxBytes?: number }): Promise<Readonly<{ buffer: Buffer; mimeType: string; fileName: string; size: number }>>;
+export function readAttachmentInput(input: AttachmentInput, options?: { maxBytes?: number }): Promise<Readonly<{ buffer: Buffer; mimeType: string; fileName: string; size: number; kind: "image" | "video" | "audio" | "file" }>>;
 export function downloadAttachment(url: string, options?: { fetchImpl?: (input: string | URL, init?: RequestInit) => Promise<Response>; maxBytes?: number; timeoutMs?: number }): Promise<DownloadedAttachment>;
 export function safeDownloadUrl(url: string): URL;
 export const MAX_ATTACHMENT_UPLOAD_BYTES: number;
