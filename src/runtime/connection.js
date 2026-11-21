@@ -4,13 +4,47 @@ const { EventEmitter } = require("node:events");
 
 const DEFAULTS = Object.freeze({ minDelayMs: 1000, maxDelayMs: 30000, factor: 2, jitter: 0.2, maxAttempts: 8 });
 
+function abortError(signal) {
+  return signal?.reason || Object.assign(new Error("Connection operation aborted"), {
+    name: "AbortError", retryable: false
+  });
+}
+
+function defaultSleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(abortError(signal));
+    };
+    if (signal?.aborted) return onAbort();
+    timer = setTimeout(() => { cleanup(); resolve(); }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 class ConnectionSupervisor extends EventEmitter {
-  constructor({ connect, disconnect, options = {}, random = Math.random, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  constructor({ connect, disconnect, options = {}, random = Math.random, sleep = defaultSleep } = {}) {
     super();
     if (typeof connect !== "function") throw new TypeError("connect function is required");
     this.connectDriver = connect;
     this.disconnectDriver = typeof disconnect === "function" ? disconnect : async () => {};
     this.options = { ...DEFAULTS, ...options };
+    const { minDelayMs, maxDelayMs, factor, jitter, maxAttempts } = this.options;
+    if (!Number.isInteger(minDelayMs) || minDelayMs < 0 || minDelayMs > 120000 ||
+        !Number.isInteger(maxDelayMs) || maxDelayMs < minDelayMs || maxDelayMs > 120000 ||
+        !Number.isFinite(factor) || factor < 1 || factor > 10 ||
+        !Number.isFinite(jitter) || jitter < 0 || jitter > 1 ||
+        !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 100) {
+      throw new TypeError("Invalid connection retry options");
+    }
+    if (typeof random !== "function" || typeof sleep !== "function") {
+      throw new TypeError("random and sleep must be functions");
+    }
     this.random = random;
     this.sleep = sleep;
     this.state = "idle";
@@ -24,6 +58,8 @@ class ConnectionSupervisor extends EventEmitter {
     this.eventCallback = null;
     this.detachDriverListener = null;
     this.connectAbortController = null;
+    this.backoffAbortController = null;
+    this.recoveryPromise = null;
   }
 
   snapshot() { return Object.freeze({ state: this.state, connected: Boolean(this.driver), generation: this.generation }); }
@@ -102,7 +138,13 @@ class ConnectionSupervisor extends EventEmitter {
         const base = Math.min(this.options.maxDelayMs, this.options.minDelayMs * Math.pow(this.options.factor, attempt));
         attempt++;
         const jitter = base * this.options.jitter * ((this.random() * 2) - 1);
-        if (attempt < this.options.maxAttempts) await this.sleep(Math.max(0, Math.round(base + jitter)));
+        if (attempt < this.options.maxAttempts) {
+          try {
+            await this.#waitBackoff(Math.max(0, Math.round(base + jitter)));
+          } catch (backoffError) {
+            if (!this.stopRequested) throw backoffError;
+          }
+        }
       }
     }
     if (!this.stopRequested && this.state !== "stopped") this.#setState("failed");
@@ -167,38 +209,62 @@ class ConnectionSupervisor extends EventEmitter {
     }
   }
 
-  async #recover(failedGeneration) {
-    if (this.recovering || this.stopRequested || failedGeneration !== this.generation) return;
+  #waitBackoff(ms) {
+    const controller = new AbortController();
+    this.backoffAbortController = controller;
+    let abortHandler;
+    const aborted = new Promise((_, reject) => {
+      abortHandler = () => reject(abortError(controller.signal));
+      if (controller.signal.aborted) abortHandler();
+      else controller.signal.addEventListener("abort", abortHandler, { once: true });
+    });
+    const sleeping = Promise.resolve().then(() => this.sleep(ms, controller.signal));
+    // A custom sleep implementation may not support AbortSignal. Race it so
+    // stop() is still prompt, and consume any late rejection.
+    sleeping.catch(() => {});
+    return Promise.race([sleeping, aborted]).finally(() => {
+      controller.signal.removeEventListener("abort", abortHandler);
+      if (this.backoffAbortController === controller) this.backoffAbortController = null;
+    });
+  }
+
+  #recover(failedGeneration) {
+    if (this.recovering || this.stopRequested || failedGeneration !== this.generation) return Promise.resolve();
     this.recovering = true;
-    const previous = this.driver;
-    this.driver = null;
-    this.#detachListener();
-    this.#setState("disconnected");
-    try {
+    const recovery = (async () => {
+      const previous = this.driver;
+      this.driver = null;
+      this.#detachListener();
+      this.#setState("disconnected");
       if (previous) await this.disconnectDriver(previous);
       // stop() may run while the previous driver is being disposed. Do not
       // let recovery call start() afterward, because start() clears stopRequested.
       if (this.stopRequested || failedGeneration !== this.generation) return;
       const driver = await this.start();
       if (driver && !this.stopRequested && this.eventCallback) this.#attachListener();
-    } catch (error) {
+    })().catch(error => {
       this.emit("connectionError", error);
-    } finally {
+    });
+    const tracked = recovery.finally(() => {
       this.recovering = false;
-    }
+      if (this.recoveryPromise === tracked) this.recoveryPromise = null;
+    });
+    this.recoveryPromise = tracked;
+    return tracked;
   }
 
   stop() {
     if (this.stopPromise) return this.stopPromise;
     this.stopRequested = true;
-    this.connectAbortController?.abort(
-      Object.assign(new Error("Connection stopped"), { name: "AbortError", retryable: false })
-    );
+    const stopReason = Object.assign(new Error("Connection stopped"), { name: "AbortError", retryable: false });
+    this.connectAbortController?.abort(stopReason);
+    this.backoffAbortController?.abort(stopReason);
     ++this.generation;
     this.eventCallback = null;
     this.#detachListener();
     const driver = this.driver;
     const pendingStart = this.startPromise;
+    const pendingRecovery = this.recoveryPromise;
     this.driver = null;
     this.stopPromise = (async () => {
       let disconnectError = null;
@@ -211,6 +277,10 @@ class ConnectionSupervisor extends EventEmitter {
       // before reporting the supervisor as fully stopped.
       if (pendingStart) {
         try { await pendingStart; }
+        catch (error) { if (!disconnectError) disconnectError = error; }
+      }
+      if (pendingRecovery) {
+        try { await pendingRecovery; }
         catch (error) { if (!disconnectError) disconnectError = error; }
       }
       this.#setState("stopped");
