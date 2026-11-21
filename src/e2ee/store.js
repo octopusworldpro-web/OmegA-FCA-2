@@ -212,11 +212,32 @@ DeviceStore.prototype.load = function(data) {
   this.backup = data.backup || null;
 };
 
-DeviceStore.fromFile = function(filePath) {
-  var store = new DeviceStore(filePath);
+DeviceStore.fromFile = function(filePath, encryptionKey) {
+  var store = new DeviceStore(filePath, encryptionKey);
   var data = null;
   if (filePath && fs.existsSync(filePath)) {
-    data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    var envelope = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!envelope || envelope.format !== "omega-fca-e2ee-store" ||
+        envelope.version !== 1 || envelope.algorithm !== "aes-256-gcm") {
+      var formatError = new Error("E2EE device store is not an encrypted OmegA-FCA store");
+      formatError.code = "FCA_E2EE_STORE_FORMAT_INVALID";
+      throw formatError;
+    }
+    if (!store.encryptionKey) {
+      var keyError = new Error("E2EE device store requires e2eeStorageKey to decrypt");
+      keyError.code = "FCA_E2EE_STORAGE_KEY_REQUIRED";
+      throw keyError;
+    }
+    try {
+      var decipher = crypto.createDecipheriv("aes-256-gcm", store.encryptionKey, unb64(envelope.iv));
+      decipher.setAuthTag(unb64(envelope.tag));
+      var clear = Buffer.concat([decipher.update(unb64(envelope.ciphertext)), decipher.final()]);
+      data = JSON.parse(clear.toString("utf8"));
+    } catch (cause) {
+      var decryptError = new Error("Could not decrypt E2EE device store; verify e2eeStorageKey", { cause: cause });
+      decryptError.code = "FCA_E2EE_STORE_DECRYPT_FAILED";
+      throw decryptError;
+    }
   }
   if (data) {
     store.load(data);
