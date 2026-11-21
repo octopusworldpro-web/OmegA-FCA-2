@@ -727,7 +727,7 @@ function createFacebookThreadApi({ session, webClient, clientId = "omega-fca" } 
       if (!Array.isArray(images)) throw createFacebookError("getThreadPictures: invalid shared-photo response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
       return Promise.all(images.map(async image => {
         const imageID = String(image?.fbid ?? "");
-        if (!/^\\d{1,40}$/.test(imageID)) throw createFacebookError("getThreadPictures: invalid photo ID in response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
+        if (!/^\d{1,40}$/.test(imageID)) throw createFacebookError("getThreadPictures: invalid photo ID in response", { code: "FCA_RESPONSE_SHAPE_INVALID", retryable: false });
         const detail = await web.post(THREAD_PICTURES_URL, { thread_id: thread, image_id: imageID });
         if (detail?.payload?.error) throw createFacebookError("getThreadPictures: Facebook rejected a photo detail request", { code: "FCA_FACEBOOK_REQUEST_REJECTED", retryable: false });
         const data = detail?.payload?.jsmods?.require?.[0]?.[3]?.[1];
