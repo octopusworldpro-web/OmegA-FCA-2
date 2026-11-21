@@ -5,7 +5,7 @@ const OPTIONAL_DRIVER_METHODS = Object.freeze([
   "disconnect", "getCurrentUserID", "sendRequest", "sendMessage", "getUserInfo", "getThreadInfo",
   "getThreadList", "markAsRead", "markAsReadAll", "markAsSeen", "deleteMessage", "deleteThread", "muteThread", "changeArchivedStatus", "setMessageReaction", "sendTypingIndicator",
   "unsendMessage", "changeNickname", "addUserToGroup", "removeUserFromGroup",
-  "createNewGroup", "getThreadHistory", "getMessage", "getFriendsList", "getUserID"
+  "createNewGroup", "changeAdminStatus", "createPoll", "handleMessageRequest", "searchForThread", "getThreadPictures", "getThreadHistory", "getMessage", "getFriendsList", "getUserID"
 ]);
 
 function validateTransportDriver(driver) {
