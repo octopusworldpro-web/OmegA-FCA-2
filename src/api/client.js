@@ -219,6 +219,63 @@ function createClient({ authenticate, options = {}, reconnect = {}, license = {}
         return operation;
       };
     }
+    if (typeof driver.sendMessage === "function") {
+      const sendCompatibilityPayload = (message, threadID, callback) => {
+        const operation = Promise.resolve().then(() => facade.sendMessage({ threadID, message }));
+        if (typeof callback === "function") {
+          operation.then(value => callback(null, value), error => callback(error));
+          return undefined;
+        }
+        return operation;
+      };
+      const mediaPayload = (attachment, caption) => ({
+        body: caption == null ? "" : String(caption),
+        attachment
+      });
+      const parseCaptionCallback = (caption, callback) =>
+        typeof caption === "function" ? { caption: "", callback: caption } : { caption: caption ?? "", callback };
+
+      facade.sendImage = (image, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        const message = typeof image === "string" && /^https?:\\/\\//i.test(image)
+          ? { body: String(parsed.caption), url: image }
+          : mediaPayload(image, parsed.caption);
+        return sendCompatibilityPayload(message, threadID, parsed.callback);
+      };
+      facade.sendVideo = (video, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        return sendCompatibilityPayload(mediaPayload(video, parsed.caption), threadID, parsed.callback);
+      };
+      facade.sendAudio = (audio, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        return sendCompatibilityPayload(mediaPayload(audio, parsed.caption), threadID, parsed.callback);
+      };
+      facade.sendFile = (file, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        return sendCompatibilityPayload(mediaPayload(file, parsed.caption), threadID, parsed.callback);
+      };
+      facade.sendGif = (gif, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        const message = typeof gif === "string" && /^https?:\\/\\//i.test(gif)
+          ? { body: String(parsed.caption), url: gif }
+          : mediaPayload(gif, parsed.caption);
+        return sendCompatibilityPayload(message, threadID, parsed.callback);
+      };
+      facade.shareLink = (url, threadID, caption, callback) => {
+        const parsed = parseCaptionCallback(caption, callback);
+        if (typeof url !== "string" || !/^https?:\\/\\//i.test(url)) throw new TypeError("shareLink URL must use HTTP or HTTPS");
+        return sendCompatibilityPayload({ body: String(parsed.caption), url }, threadID, parsed.callback);
+      };
+      facade.sendLocation = (latitude, longitude, threadID, callback) => {
+        if (latitude && typeof latitude === "object") {
+          const location = latitude;
+          const target = longitude;
+          const done = typeof threadID === "function" ? threadID : callback;
+          return sendCompatibilityPayload({ location }, target, done);
+        }
+        return sendCompatibilityPayload({ location: { latitude, longitude } }, threadID, callback);
+      };
+    }
     if (typeof driver.getUserID !== "function") {
       facade.getUserID = () => userId;
     }
