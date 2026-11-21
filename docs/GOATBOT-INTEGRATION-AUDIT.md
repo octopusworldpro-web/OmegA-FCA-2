@@ -2,8 +2,8 @@
 
 **Target:** `nirzon-islam/OmegA-Goatbot`  
 **GoatBot branch reviewed:** `fca-migration-cleanup`  
-**OmegA-FCA branch:** `prerelease/0.1.6-rc.3`  
-**Review status:** source-level login/lifecycle audit updated 2026-11-21; full call-site parity and live Facebook acceptance remain incomplete.
+**OmegA-FCA branch:** `main` (package `0.1.6-rc.3`)  
+**Review status:** complete 271-JavaScript-file GoatBot call-site inventory updated 2026-11-21; live Facebook acceptance and full API/event parity remain incomplete. See [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md).
 
 ## Verified current GoatBot integration
 
@@ -25,8 +25,9 @@ Additional API surface used or explicitly probed:
 
 - `sessionGuard(accountPath, options)`
 - `stopSessionGuard()`
-- `setOptions(options)` (optional)
-- `e2ee.isConnected()` (optional; no E2EE implementation is claimed)
+- `setOptions(options)`
+- `getAppState()`, `getCookies()`, `refreshFb_dtsg()`, `getHumanizer()`
+- The Bot conditionally probes the private `_connectE2EEAndMerge()` hook; FCA-2 does not expose it and reports E2EE capability as false.
 
 The native facade now emits a `ready` event after the synthetic/driver MQTT setup path completes CONNACK and topic subscription. This readiness signal is covered by synthetic tests; Facebook live broker acceptance and event compatibility are not proven.
 
@@ -49,21 +50,24 @@ The native facade now emits a `ready` event after the synthetic/driver MQTT setu
 
 These capabilities are implemented in code but Facebook-specific private endpoints, broker acceptance, and action payload schemas are unofficial and still require authorized live-account verification.
 
-## Partial command-call inventory (2026-11-21)
+## Complete source-level call-site inventory (2026-11-21)
 
-A source scan of GoatBot command modules found calls to `getAppState` and low-level `httpPost` in addition to the earlier login/listener methods. These are now exposed by OmegA-FCA: `getAppState` returns the current owner session cookies and must remain owner-only; `httpPost` uses the authenticated bounded web client and only permits Facebook/Messenger HTTPS hosts. The native driver also exposes `refreshFb_dtsg` for authenticated token refresh and `markAsDelivered` for the delivery receipt behavior used by GoatBot's event handler.
+The complete audit scanned all 271 JavaScript files and 28 Eta templates in the reviewed `fca-migration-cleanup` tree, including command modules, event handlers, login/lifecycle code, database controllers, dashboard routes and custom helpers. The complete method-to-file inventory and exact event/option contract are in [GOATBOT-CALLSITE-INVENTORY.md](GOATBOT-CALLSITE-INVENTORY.md).
 
-The scan also found calls to `unsendMessage`, `changeGroupImage`, `changeAvatar`, `setTitle`, `changeThreadEmoji`, `changeThreadColor`, `shareContact`, and `setOptions`. FCA now implements `unsendMessage`, `setTitle`, `changeThreadEmoji`, `changeThreadColor`, and the legacy-compatible `sendTypingIndicator` with synthetic request tests. `changeGroupImage`, `changeAvatar`, `shareContact`, and the runtime semantics of `setOptions` remain unimplemented or unverified. This remains a partial scan, not a full repository-wide inventory.
+The scan confirms direct use of login/listener lifecycle, SessionGuard, `getCurrentUserID`, `getAppState`, `getCookies`, `refreshFb_dtsg`, `getHumanizer`, `setOptions`, thread/user lookup, message send/edit/unsend/reaction, read/delivery receipts, contact sharing, group membership, nickname, title, color, emoji, group-image and avatar actions. `httpPost` is exposed by FCA-2, but no direct GoatBot call was found in this branch scan.
+
+The audit found concrete incompatibilities: `loadData.js` passes an unsupported `getThreadList(9999999, null, "INBOX")` shape; `activemember.js` requests 1,000 history items where FCA-2 caps at 100; attachment-bearing `sendMessage` is rejected; several reply-dependent commands require a nested `event.messageReply` object not produced by the native normalizer; read receipts are emitted as `read` while GoatBot expects `read_receipt`; and E2EE is not implemented. `changeGroupImage`, `changeAvatar` and `shareContact` now have native code paths, though live acceptance remains unverified.
 
 ## Confirmed remaining compatibility gaps
 
 1. GoatBot currently pins the previously published `0.1.6-rc.2` package. This branch is not active in the Bot until a deliberate package release and dependency/lockfile update.
-2. The complete set of methods called by every GoatBot command, event, dashboard, database and custom script has not yet been inventoried. This audit does not claim full FCA API parity.
-3. Full attachment upload/download, all event types and legacy event argument shapes are not implemented or verified.
-4. `createNewGroup` is not exposed until its request contract is evidenced.
-5. E2EE is not implemented.
+2. The complete call-site inventory is now recorded in `GOATBOT-CALLSITE-INVENTORY.md`; the concrete signature and event-shape mismatches in that report still need implementation.
+3. Generic message attachments/download/forwarding, nested reply-event shape, read-receipt naming and complete legacy event argument shapes are not implemented or verified.
+4. `createNewGroup` is implemented in FCA-2 but was not found as a direct call site in the audited GoatBot tree.
+5. E2EE is not implemented; the Bot's private `_connectE2EEAndMerge()` probe has no FCA-2 implementation.
 6. Native Facebook username/email-password login is deferred by the current project decision. The current test path is owner-controlled AppState; Facebook checkpoints remain owner-resolved.
 7. No authorized live-account test has yet verified MQTT connect, message receive, message send delivery, group actions, reconnect after network loss, or session expiry/recovery.
+8. GoatBot's reviewed package manifest still pins `0.1.6-rc.2`, while FCA-2 main is `0.1.6-rc.3`.
 
 ## Verification gate
 
