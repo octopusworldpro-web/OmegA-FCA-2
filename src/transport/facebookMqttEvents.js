@@ -84,7 +84,7 @@ function normalizeQuotedMessage(delta, metadata, replyTo) {
     ? quoted.messageMetadata : {};
   const quotedID = firstId(quoted?.messageID, quoted?.messageId, quoted?.id,
     quotedMetadata.messageId, replyTo);
-  const quotedSender = firstId(quoted?.senderID, quoted?.senderId, quoted?.actorId,
+  const quotedSender = firstId(quoted?.senderID, quoted?.senderId, quoted?.actorId, quoted?.actorFbId,
     quotedMetadata.actorFbId, quotedMetadata.senderId);
   const attachments = normalizeAttachments(quoted?.attachments, quoted?.attachment,
     quoted?.blob_attachments, quoted?.platform_xmd);
