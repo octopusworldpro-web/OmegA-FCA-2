@@ -88,6 +88,11 @@ export interface E2EELoginOptions {
 }
 export interface TransportDriver {
   connectE2EE?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
+  listenE2EE?(callback: (error: Error | null, event?: unknown) => void): () => void;
+  sendE2EEReaction?(threadID: string | number, messageID: string, reaction: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  editE2EEMessage?(threadID: string | number, messageID: string, newText: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  unsendE2EEMessage?(threadID: string | number, messageID: string, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
+  sendE2EETyping?(threadID: string | number, isTyping?: boolean, callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   _connectE2EEAndMerge?(callback?: (error: Error | null, result?: { userId: string; deviceId: number }) => void): Promise<{ userId: string; deviceId: number }> | void;
   sendE2EEMessage?(threadID: string | number, message: string | { body?: string; attachment?: AttachmentInput }, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
   sendE2EEAttachment?(threadID: string | number, attachment: AttachmentInput, caption?: string, options?: { replyToMessageID?: string | number } | ((error: Error | null, result?: unknown) => void), callback?: (error: Error | null, result?: unknown) => void): Promise<unknown> | void;
@@ -140,7 +145,7 @@ export interface ClientApi {
   getPublicData?(userID: string | number, callback?: (error: Error | null, result?: Record<string, unknown>) => void): Promise<Record<string, unknown>> | void;
   logout?(callback?: (error?: Error | null) => void): Promise<void> | void;
   createGroup?(groupTitle: string | null, participantIDs: Array<string | number>, callback?: (error: Error | null, threadID?: string) => void): Promise<string> | void;
-  e2ee?: Readonly<{ connect?: (...args: any[]) => any; disconnect?: () => boolean; isConnected(): boolean; getStatus(): E2EEStatus; isThread?: (threadID: string | number) => boolean; sendMessage?: (...args: any[]) => any; sendAttachment?: (...args: any[]) => any; downloadAttachment?: (...args: any[]) => any }>;
+  e2ee?: Readonly<{ connect?: (...args: any[]) => any; disconnect?: () => boolean; isConnected(): boolean; getStatus(): E2EEStatus; isThread?: (threadID: string | number) => boolean; listen?: (callback: (error: Error | null, event?: unknown) => void) => () => void; sendMessage?: (...args: any[]) => any; sendAttachment?: (...args: any[]) => any; downloadAttachment?: (...args: any[]) => any; sendReaction?: (...args: any[]) => any; editMessage?: (...args: any[]) => any; unsendMessage?: (...args: any[]) => any; sendTyping?: (...args: any[]) => any }>;
   listen(callback: (event: unknown) => void): () => void;
   listenMqtt(callback: (error: Error | null, event?: unknown) => void): () => void;
   stopListening(callback?: () => void): boolean;
