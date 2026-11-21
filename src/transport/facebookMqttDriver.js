@@ -298,16 +298,32 @@ async function createFacebookMqttDriver({
       return callE2EE("downloadMedia", [attachment]);
     }
 
+    async function assertE2EEOneToOneThread(threadID) {
+      const info = await threadApi.getThreadInfo(threadID);
+      if (!info || info.isGroup !== false) {
+        const error = new Error("E2EE controls currently support verified one-to-one threads only; group Sender Keys are not implemented");
+        error.code = info?.isGroup === true ? "FCA_E2EE_GROUP_UNSUPPORTED" : "FCA_E2EE_THREAD_TYPE_UNKNOWN";
+        error.retryable = false;
+        throw error;
+      }
+    }
     async function sendE2EEReaction(threadID, messageID, reaction) {
+      await assertE2EEOneToOneThread(threadID);
+      if (!String(messageID || "").trim()) throw new TypeError("E2EE reaction requires a message ID");
       return callE2EE("sendReaction", [String(threadID), String(messageID), String(reaction)], 3);
     }
     async function editE2EEMessage(threadID, messageID, newText) {
+      await assertE2EEOneToOneThread(threadID);
+      if (!String(messageID || "").trim()) throw new TypeError("E2EE edit requires a message ID");
       return callE2EE("editMessage", [String(threadID), String(messageID), String(newText)], 3);
     }
     async function unsendE2EEMessage(threadID, messageID) {
+      await assertE2EEOneToOneThread(threadID);
+      if (!String(messageID || "").trim()) throw new TypeError("E2EE unsend requires a message ID");
       return callE2EE("unsendMessage", [String(threadID), String(messageID)], 2);
     }
     async function sendE2EETyping(threadID, isTyping = true) {
+      await assertE2EEOneToOneThread(threadID);
       return callE2EE("sendTyping", [String(threadID), isTyping !== false], 2);
     }
 
